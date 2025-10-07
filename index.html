@@ -1,16 +1,18 @@
 <!doctype html>
 <html lang="vi">
 <head>
+  <!-- Google site verification (you provided) -->
   <meta name="google-site-verification" content="LWytketNaBiwCSr1oiKzuTAicO0iQ2735cpkGlNrZTY" />
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cho thuê xe máy Hà Nội - Hữu Hào | Thuê xe máy tháng, giao tận nơi</title>
 
-  <!-- SEO metas -->
+  <!-- SEO metas (updated with requested keywords) -->
   <meta name="description" content="Cho thuê xe máy Hữu Hào (Long Biên, Hà Nội) — Honda Cub 50cc, Vision, Sirius. Thuê theo ngày/tuần/tháng, giao tận nơi, thuê xe máy không cọc (tùy điều kiện). Giá tham khảo 150.000–200.000 VND/ngày. Liên hệ: 035 490 4601." />
   <meta name="keywords" content="Cho thuê xe máy Hà Nội, thuê xe máy Long Biên, thuê xe máy tháng Hà Nội, thuê xe máy giao tận nơi, thuê xe máy không cọc, giá thuê xe máy, Motorbike Rental Hanoi, Motorbike hire Hanoi" />
   <link rel="canonical" href="https://webhanoi.github.io/chothuexe/" />
-  <meta name="theme-color" content="#2e7d32" />
+  <meta name="theme-color" content="#111111" />
   <meta name="robots" content="index,follow" />
 
   <!-- Geo -->
@@ -32,16 +34,21 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Cho thuê xe máy Hà Nội - Hữu Hào" />
-  <meta name="twitter:description" content="Thuê xe máy Hà Nội — giao tận nơi, thuê tháng, không cọc (tùy điều kiện). Liên hệ 035 490 4601." />
+  <meta name="twitter:description" content="Thuê xe tại Hà Nội — giao tận nơi, thuê tháng, không cọc (tùy điều kiện). Liên hệ 035 490 4601." />
   <meta name="twitter:image" content="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/IMG_5052.png" />
 
   <!-- Sitemap -->
   <link rel="sitemap" type="application/xml" title="Sitemap" href="https://webhanoi.github.io/chothuexe/sitemap.xml" />
 
-  <!-- Roboto -->
+  <!-- Fonts: preconnect + Roboto -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 
-  <!-- Structured data (Organization, LocalBusiness, BreadcrumbList, FAQ, Reviews) -->
+  <!-- Preload important banner image to help LCP on mobile/desktop -->
+  <link rel="preload" as="image" href="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/IMG_5052.png">
+
+  <!-- Structured data: Organization + LocalBusiness + Breadcrumb + FAQ + Reviews -->
   <script type="application/ld+json">
   {
     "@context":"https://schema.org",
@@ -66,7 +73,6 @@
           "streetAddress":"Ngõ 5 Nguyễn Văn Cừ",
           "addressLocality":"Long Biên",
           "addressRegion":"Hanoi",
-          "postalCode":"",
           "addressCountry":"VN"
         },
         "geo":{"@type":"GeoCoordinates","latitude":21.0406490,"longitude":105.8668227},
@@ -103,102 +109,108 @@
   }
   </script>
 
-  <!-- Styles -->
+  <!-- Styles (black/white/gold theme, mobile vertical drawer menu) -->
   <style>
     :root{
-      --accent:#2e7d32;      /* requested darker green */
-      --muted:#6b6b6b;
-      --menu-bg:#f3f3f3;
-      --footer-bg:#0a0a0a;
-      --footer-text:#ffffff;
+      --bg:#fff;
+      --text:#111;
+      --muted:#9a9a9a;
+      --gold:#d4af37;
+      --menu-bg:#0f0f0f; /* dark menu background when overlay */
+      --panel:#111;
+      --footer-bg:#0b0b0b;
       --maxw:1100px;
       --radius:12px;
-      font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+      font-family:'Roboto',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
     }
     *{box-sizing:border-box}
-    html,body{height:100%;margin:0;color:#111;background:#fff;scroll-behavior:smooth}
-    a{color:inherit}
+    html,body{height:100%;margin:0;color:var(--text);background:var(--bg);scroll-behavior:smooth}
+    a{color:inherit;text-decoration:none}
     .container{max-width:var(--maxw);margin:0 auto;padding:0 16px}
 
-    /* Skip link */
+    /* skip-link */
     .skip-link{position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden}
     .skip-link:focus{left:10px;top:10px;width:auto;height:auto;padding:8px 12px;background:#000;color:#fff;border-radius:6px;z-index:9999}
 
-    /* Topbar */
-    header.topbar{background:var(--menu-bg);position:sticky;top:0;z-index:1200;border-bottom:1px solid #e6e6e6}
-    .nav-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0}
+    /* Top bar */
+    header.topbar{position:sticky;top:0;z-index:1400;background:linear-gradient(90deg,#fff, #f7f7f7);border-bottom:1px solid #e6e6e6}
+    .nav-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0}
     .brand{display:flex;align-items:center;gap:12px}
-    .brand img{width:56px;height:56px;border-radius:10px;object-fit:cover}
-    .brand h1{font-size:16px;margin:0;color:#111;line-height:1}
+    .brand img{width:56px;height:56px;border-radius:10px;object-fit:cover;display:block}
+    .brand h1{font-size:16px;margin:0;color:var(--panel);line-height:1}
     .brand p{margin:0;font-size:12px;color:var(--muted)}
-    .menu{display:flex;gap:12px;align-items:center}
-    .menu a{padding:8px 10px;border-radius:8px;color:#222;font-weight:500;transition:background .18s}
-    .menu a.active{background:rgba(46,125,50,0.12);color:var(--accent)}
-    .hamburger{display:none;cursor:pointer;margin-left:8px;padding:8px;border-radius:8px}
-    .hamburger span{display:block;width:22px;height:2px;background:#111;margin:4px 0;border-radius:2px}
-    .hamburger[aria-expanded="true"]{background:rgba(0,0,0,0.04)}
+    .menu{display:flex;gap:10px;align-items:center}
+    .menu a{padding:8px 10px;border-radius:8px;color:var(--panel);font-weight:500;transition:background .18s}
+    .menu a.active{background:rgba(212,175,55,0.08);color:var(--gold)}
+    .hamburger{display:none;cursor:pointer;padding:8px;border-radius:8px;background:transparent;border:none}
+    .hamburger span{display:block;width:22px;height:2px;background:var(--panel);margin:4px 0;border-radius:2px}
 
     @media(max-width:900px){
       .menu{display:none}
       .hamburger{display:block}
     }
 
-    .breadcrumb{font-size:14px;color:var(--muted);margin:12px 0}
-    .breadcrumb a{color:var(--accent)}
+    /* overlay + mobile drawer */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);opacity:0;pointer-events:none;transition:opacity .28s;z-index:1400}
+    .overlay.open{opacity:1;pointer-events:auto}
+    .mobile-drawer{position:fixed;right:-360px;top:0;height:100vh;width:320px;max-width:86vw;background:#0f0f0f;color:#fff;box-shadow:-10px 0 40px rgba(0,0,0,.5);transition:right .32s;z-index:1500;padding:22px 16px;overflow:auto}
+    .mobile-drawer.open{right:0}
+    .mobile-drawer nav a{display:block;padding:12px 10px;border-radius:8px;color:#fff;margin-bottom:6px}
+    .mobile-drawer .meta{margin-top:14px;font-size:14px;color:#ddd}
 
     /* Hero */
-    .hero{display:flex;flex-direction:column;gap:12px;padding:18px 0}
+    .hero{display:flex;flex-direction:column;gap:12px;padding:22px 0}
     .hero-inner{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
     .hero-left{flex:1;min-width:260px}
     .hero-right{flex:1;min-width:260px}
-    .hero h2{margin:0;font-size:26px;color:#0a0a0a}
+    .hero h2{margin:0;font-size:26px;color:var(--panel)}
     .hero p.lead{color:var(--muted);margin:8px 0 12px}
-    .banner{width:100%;height:260px;border-radius:12px;background-size:cover;background-position:center;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+    .banner{width:100%;height:260px;border-radius:12px;background-size:cover;background-position:center;box-shadow:0 12px 36px rgba(0,0,0,.12)}
 
-    /* Quick contact */
-    .quick-contact{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-weight:700;cursor:pointer;text-decoration:none}
-    .btn.call{background:var(--accent);color:#fff}
+    /* Quick contact actions */
+    .quick-contact{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;text-decoration:none}
+    .btn.call{background:var(--panel);color:var(--gold)}
     .btn.zalo{background:#2d9cdb;color:#fff}
-    .btn.map{background:#555;color:#fff}
+    .btn.map{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--panel);background:#fff}
 
     /* Pricing */
-    .pricing{margin:22px auto;max-width:760px;background:#fff;padding:12px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.04)}
+    .pricing{margin:22px auto;max-width:760px;background:#fff;padding:12px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
     .pricing table{width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden}
-    .pricing th, .pricing td{padding:10px;border-bottom:1px solid #f1f1f1;text-align:center}
-    .pricing thead th{background:var(--accent);color:#fff;font-weight:700}
+    .pricing th,.pricing td{padding:12px;border-bottom:1px solid #f1f1f1;text-align:center}
+    .pricing thead th{background:var(--panel);color:var(--gold);font-weight:700}
 
-    /* Fleet */
+    /* Fleet grid */
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
 
     /* FAQ */
     .faq{max-width:920px;margin:20px auto}
     .faq-item{margin-bottom:12px}
-    .faq-item button.q{width:100%;text-align:left;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
-    .faq-item .a{max-height:0;overflow:hidden;background:#f6fff6;padding:0 12px;border-radius:8px;margin-top:8px;transition:max-height .36s ease,padding .2s}
+    .faq-item button.q{width:100%;text-align:left;padding:12px;border-radius:10px;border:none;background:var(--panel);color:var(--gold);font-weight:700;cursor:pointer}
+    .faq-item .a{max-height:0;overflow:hidden;background:#111;padding:0 12px;border-radius:8px;margin-top:8px;color:#ddd;transition:max-height .36s ease,padding .2s}
     .faq-item.open .a{max-height:420px;padding:12px}
 
     /* Reviews slider */
     .reviews{max-width:920px;margin:24px auto;position:relative;overflow:hidden;border-radius:12px}
     .review-track{display:flex;transition:transform .5s ease}
-    .review{min-width:100%;padding:18px;background:#f7fff6;border-radius:12px}
-    .stars{color:#ffb400;font-size:16px}
+    .review{min-width:100%;padding:18px;background:#fff;border-radius:12px}
+    .stars{color:var(--gold);font-size:16px}
     .review-dots{display:flex;justify-content:center;gap:8px;margin-top:12px}
     .dot{width:10px;height:10px;border-radius:50%;background:#ddd;cursor:pointer}
-    .dot.active{background:var(--accent)}
+    .dot.active{background:var(--gold)}
 
     /* Floating contact */
-    .floating{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:10px;z-index:1500}
+    .floating{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:10px;z-index:1600}
     .floating a{width:52px;height:52px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;font-weight:700;box-shadow:0 8px 22px rgba(0,0,0,.12)}
-    .floating .call{background:var(--accent)}
+    .floating .call{background:var(--panel);color:var(--gold)}
     .floating .zalo{background:#2d9cdb}
     .floating .map{background:#1d9b6a}
-    #backToTop{position:fixed;right:18px;bottom:92px;padding:10px;border-radius:8px;background:var(--accent);color:#fff;border:none;display:none;z-index:1499}
+    #backToTop{position:fixed;right:18px;bottom:92px;padding:10px;border-radius:8px;background:var(--panel);color:var(--gold);border:none;display:none;z-index:1599}
 
     /* Footer */
-    footer{background:var(--footer-bg);color:var(--footer-text);padding:26px 16px;margin-top:30px}
-    footer a{color:var(--accent)}
-    footer .meta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+    footer{background:var(--footer-bg);color:var(--gold);padding:26px 16px;margin-top:30px}
+    footer a{color:var(--gold)}
+    footer .meta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:10px;color:#ddd}
 
     @media(max-width:720px){
       .hero-inner{flex-direction:column}
@@ -216,7 +228,7 @@
   <header class="topbar" role="banner">
     <div class="container nav-wrap" role="navigation" aria-label="Main navigation">
       <div class="brand" itemscope itemtype="http://schema.org/Organization">
-        <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/IMG_5052.png" alt="Logo Cho thuê xe máy Hữu Hào">
+        <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/IMG_5052.png" alt="Logo Cho thuê xe máy Hữu Hào" width="56" height="56">
         <div>
           <h1 itemprop="name">Cho thuê xe máy Hà Nội - Hữu Hào</h1>
           <p itemprop="description" style="color:var(--muted);font-size:12px;margin-top:4px">Ngõ 5 Nguyễn Văn Cừ, Long Biên — Mở 09:00 – 21:00</p>
@@ -241,9 +253,10 @@
       </div>
     </div>
 
-    <!-- Mobile drawer -->
-    <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true" style="position:fixed;right:-320px;top:0;height:100vh;width:320px;background:#fff;box-shadow:-8px 0 24px rgba(0,0,0,.12);transition:right .36s;z-index:1300;padding:20px;overflow:auto">
-      <nav aria-label="Mobile menu">
+    <!-- Overlay + Mobile drawer -->
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <aside class="mobile-drawer" id="mobileDrawer" aria-hidden="true" aria-label="Mobile menu">
+      <nav aria-label="Mobile menu list">
         <a href="#hero" onclick="closeDrawer()">Home</a>
         <a href="#pricing" onclick="closeDrawer()">Giá</a>
         <a href="#fleet" onclick="closeDrawer()">Dàn xe</a>
@@ -251,13 +264,12 @@
         <a href="#reviews" onclick="closeDrawer()">Đánh giá</a>
         <a href="#contact" onclick="closeDrawer()">Liên hệ</a>
       </nav>
-      <div style="margin-top:16px">
-        <a href="tel:+84354904601" class="btn call" style="display:inline-block">📞 Gọi: +84 35 490 4601</a>
+
+      <div class="meta" style="margin-top:18px">
+        <div style="margin-bottom:10px"><a href="tel:+84354904601" class="btn call" style="display:inline-block">📞 +84 35 490 4601</a></div>
+        <div><a href="https://m.facebook.com/thuexemayhanoigiare/" target="_blank" rel="noopener" class="btn" style="background:#4267B2;color:#fff">Fanpage</a></div>
       </div>
-      <div style="margin-top:12px">
-        <a href="https://m.facebook.com/thuexemayhanoigiare/" target="_blank" rel="noopener" class="btn" style="background:#4267B2;color:#fff;display:inline-block">Fanpage</a>
-      </div>
-    </div>
+    </aside>
   </header>
 
   <main id="main">
@@ -286,7 +298,9 @@
           </div>
 
           <div class="hero-right">
-            <div class="banner" role="img" aria-label="Banner Cho thuê xe máy Hữu Hào" style="background-image:url('https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/IMG_5052.png')"></div>
+            <div class="banner" role="img" aria-label="Banner Cho thuê xe máy Hữu Hào"
+              style="background-image:url('https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/IMG_5052.png');">
+            </div>
           </div>
         </div>
       </section>
@@ -312,20 +326,23 @@
 
       <!-- Fleet -->
       <section id="fleet" style="margin:22px 0" aria-labelledby="fleet-heading">
-        <h3 id="fleet-heading" style="text-align:center;color:var(--accent)">Dàn xe / Fleet</h3>
+        <h3 id="fleet-heading" style="text-align:center;color:var(--gold)">Dàn xe / Fleet</h3>
         <div class="grid" role="list">
           <figure role="listitem" style="border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.04)">
-            <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/Honda%20Cub%2050cc.jpeg" alt="Honda Cub 50cc - Cho thuê xe máy Hữu Hào" style="width:100%;height:160px;object-fit:cover;display:block">
+            <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/Honda%20Cub%2050cc.jpeg"
+              alt="Honda Cub 50cc - Cho thuê xe máy Hữu Hào" style="width:100%;height:160px;object-fit:cover;display:block" loading="lazy" decoding="async" width="800" height="533">
             <figcaption style="padding:8px"><strong>Honda Cub 50cc</strong><div style="color:var(--muted);font-size:13px">Tiện lợi, tiết kiệm nhiên liệu</div></figcaption>
           </figure>
 
           <figure role="listitem" style="border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.04)">
-            <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/Honda%20Vision.jpeg" alt="Honda Vision - Cho thuê xe máy Hữu Hào" style="width:100%;height:160px;object-fit:cover;display:block">
+            <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/Honda%20Vision.jpeg"
+              alt="Honda Vision - Cho thuê xe máy Hữu Hào" style="width:100%;height:160px;object-fit:cover;display:block" loading="lazy" decoding="async" width="800" height="533">
             <figcaption style="padding:8px"><strong>Honda Vision</strong><div style="color:var(--muted);font-size:13px">Xe tay ga, dễ lái</div></figcaption>
           </figure>
 
           <figure role="listitem" style="border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.04)">
-            <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/Yamaha%20Sirius.jpeg" alt="Yamaha Sirius - Cho thuê xe máy Hữu Hào" style="width:100%;height:160px;object-fit:cover;display:block">
+            <img src="https://raw.githubusercontent.com/webhanoi/chothuexe/dce98b289343ecdd320545ce996a0f5408f5fdc3/Yamaha%20Sirius.jpeg"
+              alt="Yamaha Sirius - Cho thuê xe máy Hữu Hào" style="width:100%;height:160px;object-fit:cover;display:block" loading="lazy" decoding="async" width="800" height="533">
             <figcaption style="padding:8px"><strong>Yamaha Sirius</strong><div style="color:var(--muted);font-size:13px">Bền bỉ, phù hợp đường dài</div></figcaption>
           </figure>
         </div>
@@ -333,7 +350,7 @@
 
       <!-- FAQ -->
       <section id="faq" class="faq" aria-labelledby="faq-heading">
-        <h3 id="faq-heading" style="text-align:center;color:var(--accent)">Câu hỏi thường gặp (FAQ)</h3>
+        <h3 id="faq-heading" style="text-align:center;color:var(--gold)">Câu hỏi thường gặp (FAQ)</h3>
 
         <!-- 12 items -->
         <div class="faq-item"><button class="q" aria-expanded="false">1. Giá thuê xe máy 1 ngày là bao nhiêu?</button><div class="a"><p>150,000 – 200,000 VND / ngày, tùy loại xe. Giá giảm nếu thuê nhiều ngày.</p></div></div>
@@ -352,7 +369,7 @@
 
       <!-- Reviews -->
       <section id="reviews" aria-labelledby="reviews-heading" style="margin-top:22px">
-        <h3 id="reviews-heading" style="text-align:center;color:var(--accent)">Đánh giá khách hàng</h3>
+        <h3 id="reviews-heading" style="text-align:center;color:var(--gold)">Đánh giá khách hàng</h3>
         <div class="reviews" aria-live="polite">
           <div class="review-track" id="reviewTrack" style="transform:translateX(0%)">
             <div class="review"><p class="stars">★★★★★</p><p>"Xe sạch, giao nhanh. Rất hài lòng!"</p><strong>- Linh</strong></div>
@@ -373,7 +390,7 @@
 
       <!-- Contact CTA -->
       <section id="contact" style="text-align:center;margin:28px 0;padding-bottom:20px" aria-labelledby="contact-heading">
-        <h3 id="contact-heading" style="color:var(--accent)">Liên hệ & Đặt xe</h3>
+        <h3 id="contact-heading" style="color:var(--gold)">Liên hệ & Đặt xe</h3>
         <p style="color:var(--muted);max-width:760px;margin:8px auto">Gọi / Zalo để đặt xe nhanh: <strong>+84 35 490 4601</strong> — Hoặc xem ảnh & feedback trên <a href="https://m.facebook.com/thuexemayhanoigiare/" target="_blank" rel="noopener">Fanpage</a>.</p>
 
         <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
@@ -388,7 +405,7 @@
   <!-- Footer -->
   <footer role="contentinfo">
     <div class="container" style="text-align:center">
-      <h4 style="margin:6px 0;color:#fff">Cho thuê xe máy Hữu Hào</h4>
+      <h4 style="margin:6px 0;color:var(--gold)">Cho thuê xe máy Hữu Hào</h4>
       <p style="color:#ddd;margin:6px 0">Ngõ 5 Nguyễn Văn Cừ, Long Biên, Hà Nội, Việt Nam</p>
       <div class="meta">
         <a href="tel:+84354904601">+84 35 490 4601</a> •
@@ -397,7 +414,7 @@
       </div>
 
       <p style="color:#bbb;margin-top:12px">© 2025 Cho thuê xe máy Hữu Hào — All rights reserved</p>
-      <p style="color:#fff;margin-top:8px"> @ Cho thuê xe máy Hữu Hào | Thiết kế bởi <a href="https://motoopen.github.io/thuexemayohoankiem/" target="_blank" rel="noopener">MotoOpen</a></p>
+      <p style="color:var(--gold);margin-top:8px"> @ Cho thuê xe máy Hữu Hào | Thiết kế bởi <a href="https://motoopen.github.io/thuexemayohoankiem/" target="_blank" rel="noopener">MotoOpen</a></p>
     </div>
   </footer>
 
@@ -410,27 +427,30 @@
 
   <button id="backToTop" aria-label="Back to top">↑</button>
 
-  <!-- Scripts -->
+  <!-- Minimal JS (deferred inlined here, small and fast) -->
   <script>
-    // Mobile drawer toggle + accessible behaviors
+    // ---- mobile drawer + overlay ----
     (function(){
       const ham = document.getElementById('hamburger');
       const drawer = document.getElementById('mobileDrawer');
-      if(!ham || !drawer) return;
+      const overlay = document.getElementById('overlay');
+
+      if(!ham || !drawer || !overlay) return;
 
       function openDrawer(){
-        drawer.style.right = '0';
+        drawer.classList.add('open');
+        overlay.classList.add('open');
         drawer.setAttribute('aria-hidden','false');
+        overlay.setAttribute('aria-hidden','false');
         ham.setAttribute('aria-expanded','true');
-        ham.classList.add('open');
-        // prevent body scroll
         document.body.style.overflow = 'hidden';
       }
       function closeDrawer(){
-        drawer.style.right = '-320px';
+        drawer.classList.remove('open');
+        overlay.classList.remove('open');
         drawer.setAttribute('aria-hidden','true');
+        overlay.setAttribute('aria-hidden','true');
         ham.setAttribute('aria-expanded','false');
-        ham.classList.remove('open');
         document.body.style.overflow = '';
       }
       window.closeDrawer = closeDrawer;
@@ -441,31 +461,34 @@
       });
       ham.addEventListener('keydown', (e)=> { if(e.key==='Enter' || e.key===' ') { e.preventDefault(); ham.click(); }});
 
-      // Close on outside click or ESC
-      document.addEventListener('click', (e)=>{
-        if(drawer.contains(e.target) || ham.contains(e.target)) return;
-        if(drawer.style.right === '0px' || drawer.style.right === '0') closeDrawer();
-      });
+      // overlay click closes
+      overlay.addEventListener('click', closeDrawer);
+
+      // close with ESC
       document.addEventListener('keydown', (e)=> { if(e.key === 'Escape') closeDrawer(); });
     })();
 
-    // FAQ toggle
-    document.querySelectorAll('.faq-item').forEach(item=>{
-      const btn = item.querySelector('.q');
-      btn && btn.addEventListener('click', ()=>{
-        const open = item.classList.toggle('open');
-        btn.setAttribute('aria-expanded', String(open));
+    // ---- FAQ toggle ----
+    (function(){
+      document.querySelectorAll('.faq-item').forEach(item=>{
+        const btn = item.querySelector('.q');
+        btn && btn.addEventListener('click', ()=>{
+          const open = item.classList.toggle('open');
+          btn.setAttribute('aria-expanded', String(open));
+        });
       });
-    });
+    })();
 
-    // Reviews slider with dots and keyboard support
+    // ---- Reviews slider ----
     (function(){
       const track = document.getElementById('reviewTrack');
       const dots = Array.from(document.querySelectorAll('.dot'));
-      let idx = 0, len = track ? track.children.length : 0, timer;
+      if(!track) return;
+      let idx = 0;
+      const len = track.children.length;
+      let timer = null;
       function show(i){
-        if(!track) return;
-        idx = ((i % len) + len) % len;
+        idx = ((i % len)+len)%len;
         track.style.transform = 'translateX(-' + (idx*100) + '%)';
         dots.forEach(d=>d.classList.remove('active'));
         if(dots[idx]) dots[idx].classList.add('active');
@@ -479,14 +502,14 @@
       }
     })();
 
-    // Back to top
+    // ---- Back to top ----
     (function(){
       const back = document.getElementById('backToTop');
       window.addEventListener('scroll', ()=> back.style.display = (window.scrollY>300) ? 'block' : 'none');
       back.addEventListener('click', ()=> window.scrollTo({top:0,behavior:'smooth'}));
     })();
 
-    // Highlight active menu on scroll
+    // ---- Active menu highlight on scroll & smoothish behavior ----
     (function(){
       const links = Array.from(document.querySelectorAll('.menu a'));
       function onScroll(){
@@ -503,16 +526,16 @@
         });
       }
       window.addEventListener('scroll', onScroll);
-      // anchor clicks close drawer if open
+      // close drawer when internal links clicked (for mobile)
       document.querySelectorAll('a[href^="#"]').forEach(a=>{
-        a.addEventListener('click', (e)=>{
+        a.addEventListener('click', ()=>{
           const drawer = document.getElementById('mobileDrawer');
-          if(drawer && drawer.style.right === '0px') window.closeDrawer && window.closeDrawer();
+          if(drawer && drawer.classList.contains('open')) window.closeDrawer && window.closeDrawer();
         });
       });
     })();
 
-    // Make some elements focusable for keyboard
+    // Make some elements keyboard-focusable
     document.querySelectorAll('figure, .review, .faq-item').forEach(el=> el.setAttribute('tabindex','0'));
   </script>
 </body>
