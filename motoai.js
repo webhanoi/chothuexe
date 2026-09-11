@@ -1,14 +1,13 @@
-/* motoai.js (v41 - Production Ready)
-   ✅ BASE: MotoAI v40 (UI Premium, NLU, Dialog, Adaptive Search)
-   ✅ PATCH: Cấu hình chuẩn Hữu Hào (Không Zalo, Chỉ Call)
-   ✅ PATCH: Sửa lỗi Spam Session, Regex 50cc, Intent Location vs Delivery
-   ✅ PATCH: Dọn sạch data Mr Tú (TypeMap, PriceTable)
-   ✅ PATCH: Nâng cấp BM25+ (Chống Zero-Match) & Crawler (Đọc Body Text)
-   ✅ PATCH: UX/UI (Mobile Height, Async Try/Catch, ARIA Attributes)
+/* motoai.js (v43 - Production Ready with Hybrid Semantic Search)
+   ✅ BASE: MotoAI v41 (UI Premium, NLU, Dialog)
+   ✅ PATCH: BM25 + Transformers.js (Xenova/paraphrase-multilingual-MiniLM-L12-v2)
+   ✅ PATCH: Lazy-loaded embeddings, IndexedDB Vector Cache, Chunking
+   ✅ PATCH: Tự động fallback BM25 nếu lỗi/không hỗ trợ
+   ✅ PATCH: Fallback "gọi 0354904601" khi confidence thấp
 */
 (function(){
-  if (window.MotoAI_v41_LOADED || document.getElementById("mta-root")) return;
-  window.MotoAI_v41_LOADED = true;
+  if (window.MotoAI_v43_LOADED || document.getElementById("mta-root")) return;
+  window.MotoAI_v43_LOADED = true;
 
   /* ====== CONFIG ====== */
   const DEF = {
@@ -36,6 +35,7 @@
 
     smart: {
       semanticSearch: true,
+      hybridSearch: true,
       extractiveQA: true,
       autoPriceLearn: false,
       searchThreshold: 1.5 
@@ -49,7 +49,7 @@
   const CFG = Object.assign({}, DEF, ORG);
   CFG.smart = Object.assign({}, DEF.smart, ORG.smart || {});
 
-  CFG.zalo = ""; // Ép vô hiệu hóa tự động Zalo
+  CFG.zalo = ""; 
 
   /* ====== HELPERS ====== */
   const $  = s => document.querySelector(s);
@@ -102,14 +102,19 @@
     return out.trim();
   }
 
+  function setStatus(text) {
+    const el = document.getElementById("mta-status");
+    if(el) el.textContent = text;
+  }
+
   /* ====== STORAGE KEYS ====== */
   const K = {
-    sess: "MotoAI_v41_session",
-    ctx: "MotoAI_v41_ctx",
-    learn: "MotoAI_v41_learn",
-    autoprices: "MotoAI_v41_auto_prices",
-    stamp: "MotoAI_v41_learnStamp",
-    clean: "MotoAI_v41_lastClean"
+    sess: "MotoAI_v43_session",
+    ctx: "MotoAI_v43_ctx",
+    learn: "MotoAI_v43_learn",
+    autoprices: "MotoAI_v43_auto_prices",
+    stamp: "MotoAI_v43_learnStamp",
+    clean: "MotoAI_v43_lastClean"
   };
 
   /* ====== UI PREMIUM (Glassmorphism + iOS) ====== */
@@ -302,11 +307,11 @@
           <div class="avatar">${CFG.avatar}</div>
           <div class="info">
             <div class="name">${CFG.brand}</div>
-            <div class="status">● Trực tuyến</div>
+            <div class="status" id="mta-status">● Trợ lý tự động</div>
           </div>
           <div class="actions">
-            ${CFG.phone?`<a class="act" href="tel:${CFG.phone}">📞</a>`:""}
-            ${CFG.map?`<a class="act q-map" href="${CFG.map}" target="_blank">📍</a>`:""}
+            ${CFG.phone?`<a class="act" href="tel:+84${CFG.phone.replace(/^0/,'')}">📞</a>`:""}
+            ${CFG.map?`<a class="act q-map" href="${CFG.map}" target="_blank" rel="noopener noreferrer">📍</a>`:""}
           </div>
           <button id="mta-close">✕</button>
         </div>
@@ -384,12 +389,24 @@
 
   /* ====== NLU & ENTITIES ====== */
   const TYPE_MAP = [
-    {k:'cub 50cc', re:/\bcub\s*50\s*cc\b|\bcub\s*50cc\b|\bcub\b/i, canon:'50cc'},
-    {k:'vision',   re:/\bvision\b/i, canon:'vision'},
-    {k:'sirius',   re:/\bsirius\b/i, canon:'sirius'},
-    {k:'50cc',     re:/\b50\s*cc\b|\b50cc\b/i, canon:'50cc'},
-    {k:'xe ga',    re:/\bxe\s*ga\b/i, canon:'xe ga'},
-    {k:'xe số',    re:/\bxe\s*số\b/i, canon:'xe số'}
+    {k:'air blade', re:/\bair\s*blade\b|airblade|\bab\b/i, canon:'air blade'},
+    {k:'vision',    re:/\bvision\b/i, canon:'vision'},
+    {k:'wave',      re:/\bwave\b/i, canon:'wave'},
+    {k:'sirius',    re:/\bsirius\b/i, canon:'sirius'},
+    {k:'blade',     re:/\bblade\b/i, canon:'blade'},
+    {k:'jupiter',   re:/\bjupiter\b/i, canon:'jupiter'},
+    {k:'lead',      re:/\blead\b/i, canon:'lead'},
+    {k:'liberty',   re:/\bliberty\b/i, canon:'liberty'},
+    {k:'vespa',     re:/\bvespa\b/i, canon:'vespa'},
+    {k:'grande',    re:/\bgrande\b/i, canon:'grande'},
+    {k:'janus',     re:/\bjanus\b/i, canon:'janus'},
+    {k:'sh',        re:/\bsh\b/i, canon:'sh'},
+    {k:'xe côn tay',re:/côn\s*tay|tay\s*côn|exciter|winner|raider|cb150|cbf190|w175|msx/i, canon:'xe côn tay'},
+    {k:'cub 50cc',  re:/\bcub\s*50\s*cc\b|\bcub\s*50cc\b|\bcub\b/i, canon:'50cc'},
+    {k:'50cc',      re:/\b50\s*cc\b|\b50cc\b/i, canon:'50cc'},
+    {k:'xe điện',   re:/xe\s*điện|vinfast|yadea|dibao|gogo|klara/i, canon:'xe điện'},
+    {k:'xe ga',     re:/\bxe\s*ga\b/i, canon:'xe ga'},
+    {k:'xe số',     re:/\bxe\s*số\b/i, canon:'xe số'}
   ];
   
   function detectType(t){
@@ -433,8 +450,8 @@
       needPrice:   [/\bgiá\b/, /bao nhiêu/, /\btiền\b/, /chi phí/, /báo giá/, /tính tiền/, /\bcost\b/, /\bprice\b/],
       needDocs:    [/thủ tục/,/giấy tờ/,/cccd/,/passport/,/hộ chiếu/],
       needContact: [/liên hệ/,/\bzalo\b/,/gọi/,/hotline/,/\bsđt\b/,/\bsdt\b/,/phone/],
-      needDelivery:[/giao/,/ship/,/tận nơi/,/đưa xe/,/mang xe/], // Bỏ địa điểm, địa chỉ
-      needLocation:[/địa chỉ/, /ở đâu/, /bản đồ/, /\bmap\b/, /chỉ đường/], // Thêm intent Location
+      needDelivery:[/giao/,/ship/,/tận nơi/,/đưa xe/,/mang xe/], 
+      needLocation:[/địa chỉ/, /ở đâu/, /bản đồ/, /\bmap\b/, /chỉ đường/], 
       needReturn:  [/trả xe/,/gia hạn/,/đổi xe/,/kết thúc thuê/],
       needPolicy:  [/điều kiện/,/chính sách/,/bảo hiểm/,/hư hỏng/,/sự cố/,/đặt cọc/,/\bcọc\b/]
     };
@@ -454,57 +471,161 @@
     '50cc':   { day:[130000] }
   };
 
-  function modelFamily(model){
-    const m = (model||'').toLowerCase();
-    if(['vision','xe ga'].includes(m)) return 'xe ga';
-    if(['sirius','xe số'].includes(m)) return 'xe số';
-    if(['50cc','cub 50cc'].includes(m)) return '50cc';
-    return null;
-  }
-
   function baseForModel(model, unit){
     if(!model) return null;
     const key = unit==="tuần"?"week":(unit==="tháng"?"month":"day");
-    const entry = PRICE_TABLE[model] || PRICE_TABLE[modelFamily(model)];
+    const entry = PRICE_TABLE[model];
     if(entry && entry[key]) return (Array.isArray(entry[key])?entry[key][0]:entry[key]);
     return null;
   }
 
   function composePrice(model, qty){
-    if(model && !qty){
-      return naturalize(`Giá ${model} được xác nhận theo thời điểm thuê. Anh/chị vui lòng gọi ${CFG.phone} để nhận báo giá.`);
+    if(qty && !model){
+      return naturalize(`Anh/chị muốn thuê mẫu xe nào để em tính giá chính xác ạ?`);
     }
 
-    if(!model && !qty) return naturalize(`Anh/chị định thuê xe gì và trong bao lâu để em tính giá ạ?`);
+    const baseDay = baseForModel(model, 'ngày');
+    if(!baseDay){
+      return naturalize(`Giá mẫu xe này cần được xác nhận tại thời điểm thuê. Anh/chị vui lòng gọi ${CFG.phone}.`);
+    }
+
+    if(model && !qty){
+      return naturalize(`Giá thuê ${model} tham khảo khoảng ${nfVND(baseDay)}đ/ngày. Anh/chị định thuê trong bao lâu ạ?`);
+    }
 
     const unitLabel = qty ? (qty.unit==="tuần"?"tuần":(qty.unit==="tháng"?"tháng":"ngày")) : "ngày";
-    const base = qty ? baseForModel(model||'xe số', qty.unit) : null;
-    if(qty && !base){
-      if(!model) return naturalize(`Anh/chị cho em xin mẫu xe (Cub 50cc, Vision, Sirius...) để em tính giá chính xác.`);
-      return naturalize(`Giá thuê ${model} theo ${qty.unit} cần check kho. Anh/chị vui lòng gọi ${CFG.phone} giúp em.`);
-    }
-    if(!qty){
-      return naturalize(`Anh/chị định thuê ${model||'xe'} trong bao lâu (1–2 ngày, 1 tuần, 1 tháng...) để em tính giá tốt nhất.`);
+    const base = baseForModel(model, qty.unit);
+    if(!base){
+      return naturalize(`Giá thuê ${model} theo ${qty.unit} cần được xác nhận tại thời điểm thuê. Anh/chị vui lòng gọi ${CFG.phone}.`);
     }
 
     const total = base * qty.n;
     let text;
     if(qty.n===1){
-      text = `Giá thuê ${model||'xe'} 1 ${unitLabel} tham khảo là khoảng ${nfVND(base)}đ.`;
+      text = `Giá thuê ${model} 1 ${unitLabel} tham khảo là khoảng ${nfVND(base)}đ.`;
     }else{
-      text = `Tổng tiền thuê ${model||'xe'} ${qty.n} ${unitLabel} tham khảo khoảng ${nfVND(total)}đ.`;
+      text = `Tổng tiền thuê ${model} ${qty.n} ${unitLabel} tham khảo khoảng ${nfVND(total)}đ.`;
     }
-    return naturalize(`${text} Để có giá ưu đãi chính xác nhất, anh/chị vui lòng gọi ${CFG.phone} ạ.`);
+    return naturalize(`${text} Để có giá chính xác tại thời điểm thuê, anh/chị vui lòng gọi ${CFG.phone} ạ.`);
   }
 
-  /* ====== SEARCH & INDEX (BM25+ FINAL) ====== */
+  /* ====== TRANSFORMERS & HYBRID SEARCH ====== */
+  let extractor = null;
+  let semanticEnginePromise = null;
+
+  function loadTransformers() {
+    if (extractor) return Promise.resolve(extractor);
+    if (semanticEnginePromise) return semanticEnginePromise;
+    setStatus("● Đang tăng cường AI...");
+    semanticEnginePromise = (async () => {
+      try {
+        const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+        env.allowLocalModels = false;
+        env.backends.onnx.wasm.numThreads = 1;
+        extractor = await pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-MiniLM-L12-v2');
+        setStatus("● AI local sẵn sàng");
+        return extractor;
+      } catch (e) {
+        console.warn("MotoAI Semantic Load Skipped (Fallback to BM25):", e);
+        setStatus("● Trợ lý tự động");
+        return null;
+      } finally {
+        if (!extractor) semanticEnginePromise = null;
+      }
+    })();
+    return semanticEnginePromise;
+  }
+
+  async function getEmbedding(text) {
+    if (!extractor) return null;
+    try {
+      const out = await extractor(text, { pooling: 'mean', normalize: true });
+      return Array.from(out.data);
+    } catch (e) { return null; }
+  }
+
+  function cosineSim(a, b) {
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    return normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  const IDB_NAME = 'MotoAI_v43_IDB';
+  const IDB_STORE = 'embeddings';
+
+  function getDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = e => {
+        if (!e.target.result.objectStoreNames.contains(IDB_STORE)) {
+          e.target.result.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function idbGet(k) {
+    try {
+      const db = await getDB();
+      return new Promise(resolve => {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get(k);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      });
+    } catch(e) { return null; }
+  }
+
+  async function idbSet(k, v) {
+    try {
+      const db = await getDB();
+      return new Promise(resolve => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(v, k);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch(e) { return false; }
+  }
+
+  function simpleHash(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    }
+    return "h_" + (hash >>> 0).toString(16);
+  }
+
+  function chunkText(text, maxLen = 600) {
+    const sents = text.replace(/\s+/g, ' ').split(/(?<=[\.\!\?])\s+/);
+    const chunks = [];
+    let cur = "";
+    for (const s of sents) {
+      if ((cur + " " + s).length > maxLen) {
+        if (cur) chunks.push(cur.trim());
+        cur = s;
+      } else {
+        cur += (cur ? " " : "") + s;
+      }
+    }
+    if (cur) chunks.push(cur.trim());
+    return chunks;
+  }
+
   function tk(s){ return (s||"").toLowerCase().normalize('NFC').replace(/[^\p{L}\p{N}\s]+/gu,' ').split(/\s+/).filter(Boolean); }
   function loadLearn(){ return safe(localStorage.getItem(K.learn)) || {}; }
   function saveLearn(o){ try{ localStorage.setItem(K.learn, JSON.stringify(o)); }catch{} }
 
   const SEARCH_SYNONYMS = {
-    "xe ga": ["vision", "cub 50cc"],
-    "xe số": ["sirius", "wave"],
+    "xe ga": ["vision", "lead", "air blade", "sh", "janus", "grande", "liberty", "vespa"],
+    "xe số": ["wave", "sirius", "blade", "jupiter", "future", "cub 50cc", "50cc"],
+    "xe điện": ["vinfast", "klara", "yadea"],
     "thủ tục": ["giấy tờ", "cccd", "passport", "hộ chiếu", "bằng lái"],
     "bảng giá": ["giá thuê", "giá xe", "bao nhiêu tiền", "chi phí"]
   };
@@ -565,33 +686,35 @@
     return 0;
   }
 
-  function searchIndex(query, k = 3) {
+  async function searchIndexHybrid(query, k = 3) {
     const cache = loadLearn();
-    const docs = [];
+    const allChunks = [];
 
-    Object.values(cache).forEach(site =>
+    Object.values(cache).forEach(site => {
       (site.pages || []).forEach(p => {
         const fullText = (p.title || '') + ' ' + (p.text || '');
-        const toks = tk(fullText);
-        docs.push({
-          id: p.url,
-          text: fullText,
-          meta: p,
-          toks: toks,
-          toksLen: toks.length
+        const chunks = chunkText(fullText, 600);
+        chunks.forEach((c, i) => {
+          allChunks.push({
+            id: p.url + '#' + i,
+            url: p.url,
+            title: p.title,
+            text: c,
+            meta: p,
+            toks: tk(c),
+            toksLen: tk(c).length
+          });
         });
-      })
-    );
+      });
+    });
 
-    if (!docs.length) return [];
+    if (!allChunks.length) return [];
 
-    const k1 = 1.5;
-    const b  = 0.75;
-    const df = new Map();
-    const tf = new Map();
+    const k1 = 1.5, b = 0.75;
+    const df = new Map(), tf = new Map();
     let totalLen = 0;
 
-    docs.forEach(d => {
+    allChunks.forEach(d => {
       totalLen += d.toksLen;
       const freq = new Map();
       d.toks.forEach(t => freq.set(t, (freq.get(t) || 0) + 1));
@@ -599,11 +722,12 @@
       new Set(d.toks).forEach(t => df.set(t, (df.get(t) || 0) + 1));
     });
 
-    const avgdl = totalLen / Math.max(1, docs.length);
-    const N = docs.length;
+    const avgdl = totalLen / Math.max(1, allChunks.length);
+    const N = allChunks.length;
     const qToks = tk(query).filter(Boolean).filter(t => !STOPWORDS.has(t));
 
-    const scored = docs.map(d => {
+    let maxBm25 = 0;
+    allChunks.forEach(d => {
       const freq = tf.get(d.id) || new Map();
       const realDl = d.toksLen || 1;
       const delta = adaptiveDelta(realDl, avgdl);
@@ -612,19 +736,14 @@
       qToks.forEach(term => {
         const f = freq.get(term) || 0;
         const c = df.get(term) || 0;
-        if (!c) return;        
-        if (f === 0) return;
+        if (!c || f === 0) return;
 
         const idf = Math.log(1 + (N - c + 0.5) / (c + 0.5));
         const norm = f + k1 * (1 - b + b * (realDl / avgdl));
-        
-        const bm25part = (f * (k1 + 1)) / norm;
-        const bm25plus = bm25part + delta;
-
+        const bm25plus = ((f * (k1 + 1)) / norm) + delta;
         score += idf * bm25plus;
       });
 
-      // Chỉ cộng điểm phụ trợ nếu thực sự có Lexical match (score > 0)
       if (score > 0) {
         score += scoreDocMeta(d.meta, query);
         score += phraseBoost(d.text, query);
@@ -632,28 +751,61 @@
         score += freshnessBoost(d.meta);
       }
 
-      return { score, meta: d.meta };
+      d.bm25Score = score;
+      if (score > maxBm25) maxBm25 = score;
     });
 
-    return scored
-      .filter(x => x.score > (CFG.smart.searchThreshold || 1.0))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, k)
-      .map(x => x.meta);
+    allChunks.forEach(d => {
+      d.bm25Norm = maxBm25 > 0 ? d.bm25Score / maxBm25 : 0;
+    });
+
+    let qEmb = null;
+    if (CFG.smart.hybridSearch !== false && typeof extractor !== 'undefined' && extractor) {
+      qEmb = await getEmbedding(query);
+    }
+
+    if (qEmb) {
+      const BATCH_SIZE = 4;
+      const SEMANTIC_MODEL = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
+      for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
+        const batch = allChunks.slice(i, i + BATCH_SIZE);
+        const pList = batch.map(async (d) => {
+          const hash = `v43:${SEMANTIC_MODEL}:${simpleHash(d.text)}`;
+          let emb = await idbGet(hash);
+          if (!emb) {
+            emb = await getEmbedding(d.text);
+            if (emb) await idbSet(hash, emb);
+          }
+          d.semanticScore = emb ? cosineSim(qEmb, emb) : 0;
+        });
+        await Promise.all(pList);
+        await sleep(0);
+      }
+    } else {
+      allChunks.forEach(d => d.semanticScore = 0);
+    }
+
+    allChunks.forEach(d => {
+      if (qEmb) {
+        if (d.semanticScore < 0.35 && d.bm25Norm === 0) {
+          d.finalScore = 0;
+        } else {
+          d.finalScore = (d.bm25Norm * 0.4) + (d.semanticScore * 0.6);
+        }
+      } else {
+        d.finalScore = d.bm25Score;
+      }
+    });
+
+    const threshold = qEmb ? 0.45 : (CFG.smart.searchThreshold || 1.0);
+
+    return allChunks
+      .filter(x => x.finalScore > threshold)
+      .sort((a, b) => b.finalScore - a.finalScore)
+      .slice(0, k);
   }
 
-  function bestSentences(text, query, k=2){
-    const sents = String(text||'').replace(/\s+/g,' ').split(/(?<=[\.\!\?])\s+/).slice(0,60);
-    const qToks=new Set(tk(query));
-    return sents
-      .map(s=>({s, sc: tk(s).reduce((a,w)=>a + (qToks.has(w)?1:0),0)}))
-      .filter(x=>x.sc>0)
-      .sort((a,b)=>b.sc-a.sc)
-      .slice(0,k)
-      .map(x=>x.s);
-  }
-
-  /* ====== CRAWLER & AUTOPRICE ====== */
+  /* ====== CRAWLER ====== */
   async function fetchTextWithMeta(url){
     const ctl = new AbortController();
     const id = setTimeout(()=>ctl.abort(), CFG.fetchTimeoutMs);
@@ -727,16 +879,16 @@
       let title = (txt.match(/<title[^>]*>([^<]+)<\/title>/i)||[])[1]||"";
       let descMeta = (txt.match(/<meta[^>]+name=(?:"|')description(?:"|')[^>]+content=(?:"|')([\s\S]*?)(?:"|')/i)||[])[1]||"";
       
-      // Khai thác triệt để body content thay vì bỏ qua nếu có meta desc
-      let bodyText = txt.replace(/<head>[\s\S]*?<\/head>/i, '')
+      let bodyText = txt.replace(/<head[\s\S]*?<\/head>/i, '')
                         .replace(/<script[\s\S]*?<\/script>/gi,' ')
                         .replace(/<style[\s\S]*?<\/style>/gi,' ')
+                        .replace(/<script type="application\/ld\+json"[\s\S]*?<\/script>/gi, ' ')
                         .replace(/<[^>]+>/g,' ')
                         .replace(/\s+/g,' ')
                         .trim()
-                        .slice(0, 2000);
+                        .slice(0, 12000);
       
-      let finalContent = (descMeta + " " + bodyText).trim().slice(0, 2500);
+      let finalContent = (descMeta + " " + bodyText).trim().slice(0, 14000);
       
       if(CFG.viOnly && !looksVN(title+' '+finalContent)) continue;
       
@@ -787,9 +939,87 @@
     return results;
   }
 
-  /* ====== ANSWER LOGIC (STATEFUL) ====== */
+  /* ====== ANSWER LOGIC ====== */
   const PREFIX = ["Chào anh/chị,","Dạ,","Em chào anh/chị,","Dạ vâng,"];
   function polite(s){ return naturalize(`${pick(PREFIX)} ${s}`); }
+
+  async function getRawAnswer(q, ctx, intents, newModel, newQty, newName, area, currentModel, lastBotState){
+    if(lastBotState && lastBotState.state === "ASK_DURATION" && newQty){
+      const modelUse = currentModel || lastBotState.type || null;
+      const ans = composePrice(modelUse, newQty);
+      return { ans, state: null, type: modelUse, qty: newQty };
+    }
+    if(lastBotState && lastBotState.state === "ASK_MODEL" && newModel){
+      const qtyUse = lastBotState.qty || newQty || null;
+      const ans = composePrice(newModel, qtyUse);
+      return { ans, state: null, type: newModel, qty: qtyUse };
+    }
+
+    let topIntent = null, topScore = 0;
+    Object.entries(intents).forEach(([k,v])=>{ if(v>topScore){ topScore=v; topIntent=k; } });
+    const hasIntent = topScore > 0;
+
+    if(!hasIntent && /(chào|xin chào|hello|hi\b)/i.test(q)){
+      const n = ctx.name ? ` ${ctx.name}` : "";
+      const ans = polite(`em là AI của ${CFG.brand}. Anh/chị${n} cần thuê xe mẫu nào ạ?`);
+      return { ans, state: null };
+    }
+
+    if(topIntent === 'needPrice' || (currentModel && newQty)){
+      const qtyUse = newQty || null;
+      const ans = composePrice(currentModel, qtyUse);
+      return { ans, state: null, type: currentModel, qty: qtyUse };
+    }
+
+    if(topIntent === "needContact"){
+      const ans = polite(`anh/chị có thể gọi trực tiếp ${CFG.phone} để được hỗ trợ ạ.`);
+      return { ans, state: null };
+    }
+    
+    if(topIntent === "needLocation"){
+      const ans = polite(`cửa hàng tại Ngõ 5 Nguyễn Văn Cừ, Long Biên, Hà Nội. Anh/chị có thể bấm biểu tượng bản đồ phía trên để chỉ đường ạ.`);
+      return { ans, state: null };
+    }
+
+    if(topIntent === "needDocs"){
+      const ans = polite(`giấy tờ và điều kiện thuê được xác nhận theo từng trường hợp. Anh/chị vui lòng gọi ${CFG.phone} trước khi nhận xe để kiểm tra chính xác ạ.`);
+      return { ans, state: null };
+    }
+    
+    if(topIntent === "needPolicy"){
+      const ans = polite(`các điều kiện như tiền cọc, trả xe và các phát sinh liên quan cần được xác nhận trực tiếp tại thời điểm thuê. Anh/chị vui lòng gọi ${CFG.phone} ạ.`);
+      return { ans, state: null };
+    }
+    
+    if(topIntent === "needReturn"){
+      const ans = polite(`Thông tin về gia hạn hoặc trả xe cần được xác nhận trực tiếp. Anh/chị vui lòng gọi ${CFG.phone} để được hỗ trợ.`);
+      return { ans, state: null };
+    }
+
+    if(topIntent === "needDelivery"){
+      const ans = polite(`khả năng giao hoặc nhận xe phụ thuộc khu vực và lịch xe tại thời điểm đặt. Anh/chị vui lòng gọi ${CFG.phone} để xác nhận ạ.`);
+      return { ans, state: null };
+    }
+
+    try{
+      const top = await searchIndexHybrid(q, 3);
+      if(top && top.length){
+        const best = top[0];
+        const ans = polite(best.text.slice(0, 400) + (best.text.length > 400 ? '...' : ''));
+        return { ans, state: null };
+      }
+    }catch(e){
+      console.warn("MotoAI Search Error:", e);
+    }
+
+    if(currentModel && !newQty){
+      const ans = polite(`anh/chị định thuê xe ${currentModel} trong bao lâu để em tính giá tốt nhất ạ?`);
+      return { ans, state: "ASK_DURATION", type: currentModel };
+    }
+
+    const ans = polite(`em chưa hiểu rõ ý anh/chị. Anh/chị vui lòng gọi ${CFG.phone} để được tư vấn nhanh nhất ạ.`);
+    return { ans, state: null };
+  }
 
   async function deepAnswer(userText){
     const q = (userText||"").trim();
@@ -815,109 +1045,17 @@
 
     let lastBotState = null;
     for(let i=ctx.turns.length-1;i>=0;i--){
-      const t = ctx.turns[i];
-      if(t.from === "bot" && t.state){
-        lastBotState = t;
+      if(ctx.turns[i].from === "bot"){
+        if(ctx.turns[i].state) lastBotState = ctx.turns[i];
         break;
       }
     }
 
-    if(lastBotState && lastBotState.state === "ASK_DURATION" && newQty){
-      const modelUse = currentModel || lastBotState.type || null;
-      const ans = composePrice(modelUse, newQty);
-      pushCtx({from:"bot", raw:ans, state:null, type:modelUse, qty:newQty});
-      return ans;
-    }
-    if(lastBotState && lastBotState.state === "ASK_MODEL" && newModel){
-      const qtyUse = lastBotState.qty || newQty || null;
-      const ans = composePrice(newModel, qtyUse);
-      pushCtx({from:"bot", raw:ans, state:null, type:newModel, qty:qtyUse});
-      return ans;
-    }
-
-    let topIntent = null, topScore = 0;
-    Object.entries(intents).forEach(([k,v])=>{ if(v>topScore){ topScore=v; topIntent=k; } });
-    const hasIntent = topScore > 0;
-
-    if(!hasIntent && /(chào|xin chào|hello|hi\b)/i.test(q)){
-      const n = ctx.name ? ` ${ctx.name}` : "";
-      const ans = polite(`em là AI của ${CFG.brand}. Anh/chị${n} cần thuê xe mẫu nào ạ?`);
-      pushCtx({from:"bot", raw:ans, state:null});
-      return ans;
-    }
-
-    if(topIntent === 'needPrice' || (currentModel && newQty)){
-      const qtyUse = newQty || null;
-      const ans = composePrice(currentModel, qtyUse);
-      pushCtx({from:"bot", raw:ans, state:null, type:currentModel, qty:qtyUse});
-      return ans;
-    }
-
-    if(topIntent === "needContact"){
-      const ans = polite(`anh/chị có thể gọi trực tiếp ${CFG.phone} để được hỗ trợ ạ.`);
-      pushCtx({ from: "bot", raw: ans, state: null });
-      return ans;
-    }
-    
-    if(topIntent === "needLocation"){
-      const ans = polite(`cửa hàng tại Ngõ 5 Nguyễn Văn Cừ, Long Biên, Hà Nội. Anh/chị có thể bấm biểu tượng bản đồ phía trên để chỉ đường ạ.`);
-      pushCtx({from:"bot", raw:ans, state:null});
-      return ans;
-    }
-
-    if(topIntent === "needDocs"){
-      const ans = polite(`giấy tờ và điều kiện thuê được xác nhận theo từng trường hợp. Anh/chị vui lòng gọi ${CFG.phone} trước khi nhận xe để kiểm tra chính xác ạ.`);
-      pushCtx({ from: "bot", raw: ans, state: null });
-      return ans;
-    }
-    
-    if(topIntent === "needPolicy"){
-      const ans = polite(`các điều kiện như tiền cọc, trả xe và các phát sinh liên quan cần được xác nhận trực tiếp tại thời điểm thuê. Anh/chị vui lòng gọi ${CFG.phone} ạ.`);
-      pushCtx({ from: "bot", raw: ans, state: null });
-      return ans;
-    }
-    
-    if(topIntent === "needReturn"){
-      const ans = polite(`việc gia hạn hoặc trả xe cần được thông báo trước. Anh/chị vui lòng gọi ${CFG.phone} để được hỗ trợ ạ.`);
-      pushCtx({ from: "bot", raw: ans, state: null });
-      return ans;
-    }
-
-    if(topIntent === "needDelivery"){
-      const ans = polite(`khả năng giao hoặc nhận xe phụ thuộc khu vực và lịch xe tại thời điểm đặt. Anh/chị vui lòng gọi ${CFG.phone} để xác nhận ạ.`);
-      pushCtx({ from: "bot", raw: ans, state: null });
-      return ans;
-    }
-
-    try{
-      const top = searchIndex(q, 3);
-      if(top && top.length){
-        if(CFG.smart.extractiveQA){
-          const sn = bestSentences((top[0].title+'. ')+top[0].text, q, 2).join(' ');
-          if(sn && sn.length>20){
-            const ans = naturalize(sn);
-            pushCtx({from:"bot", raw:ans, state:null});
-            return ans;
-          }
-        }
-        const ans = polite(((top[0].title?top[0].title+' — ':'')+top[0].text).slice(0,160)+'...');
-        pushCtx({from:"bot", raw:ans, state:null});
-        return ans;
-      }
-    }catch(e){}
-
-    if(currentModel && !newQty){
-      const ans = polite(`anh/chị định thuê xe ${currentModel} trong bao lâu để em tính giá tốt nhất ạ?`);
-      pushCtx({from:"bot", raw:ans, state:"ASK_DURATION", type:currentModel});
-      return ans;
-    }
-
-    const ans = polite(`anh/chị đang quan tâm mẫu xe nào (Cub 50cc, Vision, Sirius...) và dự định thuê mấy ngày ạ?`);
-    pushCtx({from:"bot", raw:ans, state:"ASK_MODEL"});
-    return ans;
+    const result = await getRawAnswer(q, ctx, intents, newModel, newQty, newName, area, currentModel, lastBotState);
+    return result;
   }
 
-  /* ====== CONTROLLER & EVENTS ====== */
+  /* ====== CONTROLLER ====== */
   let isOpen=false, sending=false, vvBound=false;
 
   function showTyping(){
@@ -945,9 +1083,29 @@
       showTyping();
       await sleep((window.innerWidth < 480 ? 800 : 1200) + Math.random()*500);
 
-      const ans = await deepAnswer(v);
+      let result = await deepAnswer(v);
+      
+      const ctx = getCtx();
+      const bots = ctx.turns.filter(turn => turn.from === 'bot').slice(-2);
+      if(bots.length > 0) {
+        const currentAnsRaw = result.ans.replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
+        let isRepeat = false;
+        for(let b of bots) {
+           if(b.raw && b.raw.replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase() === currentAnsRaw) {
+              isRepeat = true;
+              break;
+           }
+        }
+        if(isRepeat) {
+           result.ans = naturalize(`Anh/chị nói rõ thêm mẫu xe, thời gian thuê hoặc nội dung cần hỏi để em hỗ trợ chính xác hơn nhé.`);
+           result.state = null;
+        }
+      }
+
+      pushCtx({from:"bot", raw:result.ans, state:result.state, type:result.type, qty:result.qty});
+      
       hideTyping();
-      addMsg("bot", sanitizeReply(ans));
+      addMsg("bot", sanitizeReply(result.ans));
     } catch(e) {
       hideTyping();
       addMsg("bot", `Có lỗi xử lý. Anh/chị vui lòng gọi ${CFG.phone} để được hỗ trợ.`);
@@ -958,6 +1116,11 @@
 
   function openChat(){
     if(isOpen) return;
+    
+    if (CFG.smart.hybridSearch !== false) {
+      loadTransformers();
+    }
+
     $("#mta-card").classList.add("open");
     $("#mta-card").setAttribute("aria-hidden", "false");
     $("#mta-backdrop").classList.add("show");
@@ -1064,7 +1227,7 @@
     }
   });
 
-  window.MotoAI_v41 = {
+  window.MotoAI_v43 = {
     open: openChat,
     close: closeChat,
     send: sendUser,
