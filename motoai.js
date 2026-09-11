@@ -1,1 +1,1074 @@
-ểi
+/* motoai.js (v41 - Production Ready)
+   ✅ BASE: MotoAI v40 (UI Premium, NLU, Dialog, Adaptive Search)
+   ✅ PATCH: Cấu hình chuẩn Hữu Hào (Không Zalo, Chỉ Call)
+   ✅ PATCH: Sửa lỗi Spam Session, Regex 50cc, Intent Location vs Delivery
+   ✅ PATCH: Dọn sạch data Mr Tú (TypeMap, PriceTable)
+   ✅ PATCH: Nâng cấp BM25+ (Chống Zero-Match) & Crawler (Đọc Body Text)
+   ✅ PATCH: UX/UI (Mobile Height, Async Try/Catch, ARIA Attributes)
+*/
+(function(){
+  if (window.MotoAI_v41_LOADED || document.getElementById("mta-root")) return;
+  window.MotoAI_v41_LOADED = true;
+
+  /* ====== CONFIG ====== */
+  const DEF = {
+    brand: "Cho thuê xe máy Hữu Hào",
+    phone: "0354904601",
+    zalo: "",
+    map: "https://maps.app.goo.gl/uH3w1zWxtEFUwuUz8?g_st=ipc",
+    avatar: "👩‍💼",
+    themeColor: "#007AFF",
+
+    autolearn: true,
+    viOnly: true,
+    deepContext: true,
+    maxContextTurns: 8,
+
+    extraSites: [location.origin],
+    crawlDepth: 1,
+    refreshHours: 24,
+    maxPagesPerDomain: 80,
+    maxTotalPages: 300,
+
+    fetchTimeoutMs: 10000,
+    fetchPauseMs: 160,
+    disableQuickMap: false,
+
+    smart: {
+      semanticSearch: true,
+      extractiveQA: true,
+      autoPriceLearn: false,
+      searchThreshold: 1.5 
+    },
+    debug: false,
+    noLinksInReply: true,
+    noMarkdownReply: true
+  };
+  
+  const ORG = window.MotoAI_CONFIG || {};
+  const CFG = Object.assign({}, DEF, ORG);
+  CFG.smart = Object.assign({}, DEF.smart, ORG.smart || {});
+
+  CFG.zalo = ""; // Ép vô hiệu hóa tự động Zalo
+
+  /* ====== HELPERS ====== */
+  const $  = s => document.querySelector(s);
+  const safe = s => { try{ return JSON.parse(s); }catch{ return null; } };
+  const sleep = ms => new Promise(r=>setTimeout(r,ms));
+  const nowSec = ()=> Math.floor(Date.now()/1000);
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const nfVND = n => (n||0).toLocaleString('vi-VN');
+  const clamp = (n,min,max)=> Math.max(min, Math.min(max,n));
+  const sameHost = (u, origin)=> { try{ return new URL(u).host.replace(/^www\./,'') === new URL(origin).host.replace(/^www\./,''); }catch{ return false; } };
+
+  function naturalize(t){
+    if(!t) return t;
+    let s = " "+t+" ";
+    s = s.replace(/\s+ạ([.!?,\s]|$)/gi, "$1")
+         .replace(/\s+nhé([.!?,\s]|$)/gi, "$1")
+         .replace(/\s+nha([.!?,\s]|$)/gi, "$1");
+    s = s.replace(/\s{2,}/g," ").trim();
+    if(!/[.!?]$/.test(s)) s+=".";
+    return s.replace(/\.\./g,".");
+  }
+  function looksVN(s){
+    if(/[ăâêôơưđà-ỹ]/i.test(s)) return true;
+    const hits = (s.match(/\b(xe|thuê|giá|liên hệ|hà nội|cọc|giấy tờ)\b/gi)||[]).length;
+    return hits >= 2;
+  }
+  function escapeHtml(s){
+    return String(s||'')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  const BRANDS = ['honda','yamaha','suzuki','piaggio','vinfast','sym','kymco'];
+  function stripBrands(text){
+    return String(text||'')
+      .replace(new RegExp(`\\b(${BRANDS.join('|')})\\b`, 'ig'), '')
+      .replace(/\s{2,}/g,' ')
+      .trim();
+  }
+  function sanitizeReply(s){
+    let out = String(s||'');
+    if(CFG.noLinksInReply){
+      out = out.replace(/\bhttps?:\/\/\S+/gi,'').replace(/\bwww\.\S+/gi,'');
+    }
+    if(CFG.noMarkdownReply){
+      out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1').replace(/[*_`~>]+/g, '');
+    }
+    return out.trim();
+  }
+
+  /* ====== STORAGE KEYS ====== */
+  const K = {
+    sess: "MotoAI_v41_session",
+    ctx: "MotoAI_v41_ctx",
+    learn: "MotoAI_v41_learn",
+    autoprices: "MotoAI_v41_auto_prices",
+    stamp: "MotoAI_v41_learnStamp",
+    clean: "MotoAI_v41_lastClean"
+  };
+
+  /* ====== UI PREMIUM (Glassmorphism + iOS) ====== */
+  const CSS = `
+  :root{
+    --mta-z: 2147483647;
+    --m-primary: ${CFG.themeColor};
+    --m-bg: #ffffff;
+    --m-bg-sec: #f2f2f7;
+    --m-text: #1c1c1e;
+    --m-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    --m-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --m-in-h: 44px;
+    --m-in-fs: 16px;
+  }
+  #mta-root{
+    position:fixed; right:20px; bottom:calc(20px + env(safe-area-inset-bottom, 0));
+    z-index:var(--mta-z); font-family:var(--m-font);
+    pointer-events:none;
+  }
+  #mta-root > * { pointer-events:auto; }
+  #mta-bubble{
+    width:60px; height:60px; border:none; border-radius:30px;
+    background: linear-gradient(135deg, var(--m-primary), #00C6FF);
+    box-shadow: 0 4px 14px rgba(0, 122, 255, 0.4);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:#fff; font-size:28px;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #mta-bubble:active { transform: scale(0.9); }
+  #mta-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.3);
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+    opacity:0; pointer-events:none; transition:opacity 0.3s ease;
+  }
+  #mta-backdrop.show{ opacity:1; pointer-events:auto; }
+  #mta-card{
+    position:fixed; right:20px; bottom:20px;
+    width:min(400px, calc(100% - 40px)); height:75vh; max-height:720px;
+    background: var(--m-bg); border-radius:24px; box-shadow: var(--m-shadow);
+    display:flex; flex-direction:column; overflow:hidden;
+    opacity: 0; transform: translateY(20px) scale(0.95); pointer-events: none;
+    transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.3s ease;
+    transform-origin: bottom right;
+  }
+  #mta-card.open{ opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  #mta-header{
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    position: absolute; top:0; left:0; right:0; z-index: 10;
+  }
+  #mta-header .bar{ display:flex; align-items:center; gap:12px; padding:12px 16px; }
+  #mta-header .avatar{
+    width:36px; height:36px; border-radius:50%;
+    background: linear-gradient(135deg, #e0e0e0, #ffffff);
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+  }
+  #mta-header .info{ flex:1; display:flex; flex-direction:column; }
+  #mta-header .name{ font-weight:600; font-size:15px; color:var(--m-text); }
+  #mta-header .status{ font-size:12px; color:#34C759; display:flex; align-items:center; gap:4px; font-weight:500; }
+  #mta-header .actions{ display:flex; gap:8px; }
+  #mta-header .act{
+    width:32px; height:32px; border-radius:50%;
+    background: rgba(0,0,0,0.04);
+    display:flex; align-items:center; justify-content:center;
+    color: var(--m-primary); text-decoration:none; font-size:16px;
+    transition: background 0.2s;
+  }
+  #mta-header .act:hover{ background: rgba(0,0,0,0.08); }
+  #mta-close{
+    background:none; border:none; color:#8e8e93; font-size:24px;
+    cursor:pointer; margin-left:4px; padding:0 4px;
+  }
+  #mta-body{
+    flex:1; overflow-y:auto;
+    background: var(--m-bg-sec);
+    padding: 70px 12px 12px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .m-msg{
+    max-width:80%; margin:6px 0; padding:10px 14px;
+    border-radius:18px; line-height:1.45; word-break:break-word; font-size:15px;
+    position: relative; animation: msgPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes msgPop {
+    from{ opacity:0; transform:translateY(10px) scale(0.95); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  .m-msg.bot{
+    background: #fff; color: var(--m-text);
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .m-msg.user{
+    background: var(--m-primary); color: #fff;
+    margin-left: auto; border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
+  }
+  #mta-typing{
+    margin:6px 0; padding:8px 12px; background:#fff;
+    border-radius:18px; display:inline-block;
+    border-bottom-left-radius:4px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04);
+  }
+  .dot-flashing {
+    position: relative; width: 6px; height: 6px; border-radius: 5px;
+    background-color: #9880ff; color: #9880ff;
+    animation: dot-flashing 1s infinite linear alternate; animation-delay: 0.5s;
+    display:inline-block; margin: 0 8px;
+  }
+  .dot-flashing::before, .dot-flashing::after {
+    content: ""; display: inline-block; position: absolute; top: 0;
+    width: 6px; height: 6px; border-radius: 5px;
+    background-color: #9880ff; color: #9880ff;
+    animation: dot-flashing 1s infinite alternate;
+  }
+  .dot-flashing::before { left: -10px; animation-delay: 0s; }
+  .dot-flashing::after { left: 10px; animation-delay: 1s; }
+  @keyframes dot-flashing {
+    0% { background-color: #9880ff; }
+    50%, 100% { background-color: rgba(152, 128, 255, 0.2); }
+  }
+  #mta-tags{
+    background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);
+    border-top:1px solid rgba(0,0,0,0.05);
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+  }
+  #mta-tags.hidden{ max-height:0 !important; opacity:0; pointer-events:none; }
+  #mta-tags .track{
+    display:flex; overflow-x:auto; padding:8px 12px; gap:8px;
+    scrollbar-width:none;
+  }
+  #mta-tags .track::-webkit-scrollbar { display:none; }
+  #mta-tags button{
+    flex:0 0 auto; background:#fff; border:1px solid #d1d1d6;
+    border-radius:16px; padding:6px 12px; font-size:13px;
+    color:var(--m-text); cursor:pointer; transition:all 0.2s; font-weight:500;
+  }
+  #mta-tags button:active{ background:#e5e5ea; transform:scale(0.96); }
+  #mta-input{
+    background: rgba(255,255,255,0.95);
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0));
+    display:flex; gap:10px; align-items:center;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  #mta-in{
+    flex:1; height:var(--m-in-h); border:1px solid #d1d1d6; border-radius:22px;
+    padding:0 16px; font-size:var(--m-in-fs); background:#fff; color:var(--m-text);
+    outline:none; -webkit-appearance:none; transition: border-color 0.2s;
+  }
+  #mta-in:focus{ border-color:var(--m-primary); }
+  #mta-send{
+    width:40px; height:40px; border:none; border-radius:50%;
+    background:var(--m-primary); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:18px;
+    box-shadow:0 2px 6px rgba(0,122,255,0.3);
+    transition: transform 0.2s;
+  }
+  #mta-send:active{ transform:scale(0.9); }
+  @media(prefers-color-scheme:dark){
+    :root{ --m-bg: #1c1c1e; --m-bg-sec: #000000; --m-text: #ffffff; --m-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); }
+    #mta-header{ background: rgba(28, 28, 30, 0.85); border-bottom:1px solid rgba(255,255,255,0.1); }
+    #mta-header .name{ color:#fff; }
+    #mta-header .act{ background:rgba(255,255,255,0.1); color:#fff; }
+    .m-msg.bot{ background:#2c2c2e; color:#fff; }
+    #mta-input{ background:#1c1c1e; border-top:1px solid rgba(255,255,255,0.1); }
+    #mta-in{ background:#2c2c2e; border-color:#3a3a3c; color:#fff; }
+    #mta-tags{ background:rgba(28,28,30,0.9); border-top:1px solid rgba(255,255,255,0.1); }
+    #mta-tags button{ background:#2c2c2e; border-color:#3a3a3c; color:#fff; }
+    #mta-typing{ background:#2c2c2e; }
+  }
+  @media(max-width:480px){
+    #mta-card{
+      right:0; left:0; bottom:0; width:100%; height:100%; max-height:none;
+      border-radius:0; border-top-left-radius:20px; border-top-right-radius:20px;
+    }
+  }`;
+
+  const HTML = `
+  <div id="mta-root" aria-live="polite">
+    <button id="mta-bubble" aria-label="Chat">💬</button>
+    <div id="mta-backdrop"></div>
+    <section id="mta-card" role="dialog" aria-hidden="true">
+      <header id="mta-header">
+        <div class="bar">
+          <div class="avatar">${CFG.avatar}</div>
+          <div class="info">
+            <div class="name">${CFG.brand}</div>
+            <div class="status">● Trực tuyến</div>
+          </div>
+          <div class="actions">
+            ${CFG.phone?`<a class="act" href="tel:${CFG.phone}">📞</a>`:""}
+            ${CFG.map?`<a class="act q-map" href="${CFG.map}" target="_blank">📍</a>`:""}
+          </div>
+          <button id="mta-close">✕</button>
+        </div>
+      </header>
+      <main id="mta-body"></main>
+      <div id="mta-tags">
+        <div class="track" id="mta-tag-track">
+          <button data-q="Giá thuê xe máy">💰 Giá thuê</button>
+          <button data-q="Thuê xe ga">🛵 Xe ga</button>
+          <button data-q="Thuê xe số">🏍 Xe số</button>
+          <button data-q="Địa chỉ cửa hàng">📍 Ở đâu</button>
+          <button data-q="Thủ tục">📄 Thủ tục</button>
+        </div>
+      </div>
+      <footer id="mta-input">
+        <input id="mta-in" placeholder="Nhắn tin..." autocomplete="off" enterkeyhint="send"/>
+        <button id="mta-send">➤</button>
+      </footer>
+    </section>
+  </div>`;
+
+  /* ====== SESSION & CONTEXT ====== */
+  const MAX_MSG = 12;
+
+  function getSess(){
+    const arr = safe(localStorage.getItem(K.sess)) || [];
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function saveSess(a){
+    try{ localStorage.setItem(K.sess, JSON.stringify(a.slice(-MAX_MSG))); }catch{}
+  }
+
+  function renderMsg(role, text){
+    if(!text) return;
+    const body = document.querySelector("#mta-body");
+    if(!body) return;
+    const el = document.createElement("div");
+    el.className = "m-msg " + (role === "user" ? "user" : "bot");
+    el.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function addMsg(role, text){
+    if(!text) return;
+    renderMsg(role, text);
+    const arr = getSess();
+    arr.push({ role, text, t: Date.now() });
+    saveSess(arr);
+  }
+
+  function renderSess(){
+    const body = document.querySelector("#mta-body");
+    if(!body) return;
+    body.innerHTML = "";
+    const arr = getSess();
+    if(arr.length){
+      arr.forEach(m => renderMsg(m.role, m.text));
+    }else{
+      addMsg("bot", naturalize(`Xin chào, em là hỗ trợ viên của ${CFG.brand}. Anh/chị cần hỏi về Cub 50cc, Vision, Sirius hay giá thuê ạ?`));
+    }
+  }
+
+  function getCtx(){ return safe(localStorage.getItem(K.ctx)) || {turns:[]}; }
+  function pushCtx(delta){
+    try{
+      const ctx=getCtx();
+      if(delta && delta.name) ctx.name = delta.name;
+      ctx.turns.push(Object.assign({t:Date.now()}, delta||{}));
+      ctx.turns = ctx.turns.slice(-clamp(CFG.maxContextTurns||8,3,10));
+      localStorage.setItem(K.ctx, JSON.stringify(ctx));
+    }catch{}
+  }
+
+  /* ====== NLU & ENTITIES ====== */
+  const TYPE_MAP = [
+    {k:'cub 50cc', re:/\bcub\s*50\s*cc\b|\bcub\s*50cc\b|\bcub\b/i, canon:'50cc'},
+    {k:'vision',   re:/\bvision\b/i, canon:'vision'},
+    {k:'sirius',   re:/\bsirius\b/i, canon:'sirius'},
+    {k:'50cc',     re:/\b50\s*cc\b|\b50cc\b/i, canon:'50cc'},
+    {k:'xe ga',    re:/\bxe\s*ga\b/i, canon:'xe ga'},
+    {k:'xe số',    re:/\bxe\s*số\b/i, canon:'xe số'}
+  ];
+  
+  function detectType(t){
+    const raw = String(t||'');
+    const nobrand = stripBrands(raw);
+    for(const it of TYPE_MAP){ if(it.re.test(nobrand)) return it.canon; }
+    for(const it of TYPE_MAP){ if(it.re.test(raw)) return it.canon; }
+    return null;
+  }
+  
+  function detectQty(t){
+    const text = String(t || "");
+    const m = text.match(/(?:thuê\s*)?(\d{1,3})\s*(ngày|day|days|tuần|tuan|week|weeks|tháng|thang|month|months)\b/i);
+    if(!m) return null;
+    const n = parseInt(m[1], 10);
+    if(!n || n > 365) return null;
+    let unit = "ngày";
+    if(/tuần|tuan|week/i.test(m[2])) unit = "tuần";
+    else if(/tháng|thang|month/i.test(m[2])) unit = "tháng";
+    return { n, unit };
+  }
+
+  function detectArea(t){
+    const s = (t||"").toLowerCase();
+    if(/phố cổ|phoco|old quarter/.test(s)) return 'Phố Cổ';
+    if(/hoàn kiếm|hoan kiem/.test(s)) return 'Hoàn Kiếm';
+    if(/long biên|long bien/.test(s)) return 'Long Biên';
+    if(/tây hồ|tay ho/.test(s)) return 'Tây Hồ';
+    return null;
+  }
+  
+  function detectName(t){
+    const m = (t||"").match(/\b(tên|name|là)\s+(em|mình|tớ|anh|chị)?\s*([A-ZÀ-Ỹ][a-zà-ỹ]+(\s[A-ZÀ-Ỹ][a-zà-ỹ]+)*)/);
+    if(m && m[3]) return m[3];
+    return null;
+  }
+  
+  function detectIntent(t){
+    const text = (t||"").toLowerCase();
+    const rules = {
+      needPrice:   [/\bgiá\b/, /bao nhiêu/, /\btiền\b/, /chi phí/, /báo giá/, /tính tiền/, /\bcost\b/, /\bprice\b/],
+      needDocs:    [/thủ tục/,/giấy tờ/,/cccd/,/passport/,/hộ chiếu/],
+      needContact: [/liên hệ/,/\bzalo\b/,/gọi/,/hotline/,/\bsđt\b/,/\bsdt\b/,/phone/],
+      needDelivery:[/giao/,/ship/,/tận nơi/,/đưa xe/,/mang xe/], // Bỏ địa điểm, địa chỉ
+      needLocation:[/địa chỉ/, /ở đâu/, /bản đồ/, /\bmap\b/, /chỉ đường/], // Thêm intent Location
+      needReturn:  [/trả xe/,/gia hạn/,/đổi xe/,/kết thúc thuê/],
+      needPolicy:  [/điều kiện/,/chính sách/,/bảo hiểm/,/hư hỏng/,/sự cố/,/đặt cọc/,/\bcọc\b/]
+    };
+    const scores = {};
+    for(const k in rules){
+      scores[k] = rules[k].reduce((sum,re)=> sum + (re.test(text) ? 1 : 0), 0);
+    }
+    return scores;
+  }
+
+  /* ====== PRICE TABLE ====== */
+  const PRICE_TABLE = {
+    'xe số':  { day:[120000] },
+    'xe ga':  { day:[150000] },
+    'vision': { day:[150000] },
+    'sirius': { day:[120000] },
+    '50cc':   { day:[130000] }
+  };
+
+  function modelFamily(model){
+    const m = (model||'').toLowerCase();
+    if(['vision','xe ga'].includes(m)) return 'xe ga';
+    if(['sirius','xe số'].includes(m)) return 'xe số';
+    if(['50cc','cub 50cc'].includes(m)) return '50cc';
+    return null;
+  }
+
+  function baseForModel(model, unit){
+    if(!model) return null;
+    const key = unit==="tuần"?"week":(unit==="tháng"?"month":"day");
+    const entry = PRICE_TABLE[model] || PRICE_TABLE[modelFamily(model)];
+    if(entry && entry[key]) return (Array.isArray(entry[key])?entry[key][0]:entry[key]);
+    return null;
+  }
+
+  function composePrice(model, qty){
+    if(model && !qty){
+      return naturalize(`Giá ${model} được xác nhận theo thời điểm thuê. Anh/chị vui lòng gọi ${CFG.phone} để nhận báo giá.`);
+    }
+
+    if(!model && !qty) return naturalize(`Anh/chị định thuê xe gì và trong bao lâu để em tính giá ạ?`);
+
+    const unitLabel = qty ? (qty.unit==="tuần"?"tuần":(qty.unit==="tháng"?"tháng":"ngày")) : "ngày";
+    const base = qty ? baseForModel(model||'xe số', qty.unit) : null;
+    if(qty && !base){
+      if(!model) return naturalize(`Anh/chị cho em xin mẫu xe (Cub 50cc, Vision, Sirius...) để em tính giá chính xác.`);
+      return naturalize(`Giá thuê ${model} theo ${qty.unit} cần check kho. Anh/chị vui lòng gọi ${CFG.phone} giúp em.`);
+    }
+    if(!qty){
+      return naturalize(`Anh/chị định thuê ${model||'xe'} trong bao lâu (1–2 ngày, 1 tuần, 1 tháng...) để em tính giá tốt nhất.`);
+    }
+
+    const total = base * qty.n;
+    let text;
+    if(qty.n===1){
+      text = `Giá thuê ${model||'xe'} 1 ${unitLabel} tham khảo là khoảng ${nfVND(base)}đ.`;
+    }else{
+      text = `Tổng tiền thuê ${model||'xe'} ${qty.n} ${unitLabel} tham khảo khoảng ${nfVND(total)}đ.`;
+    }
+    return naturalize(`${text} Để có giá ưu đãi chính xác nhất, anh/chị vui lòng gọi ${CFG.phone} ạ.`);
+  }
+
+  /* ====== SEARCH & INDEX (BM25+ FINAL) ====== */
+  function tk(s){ return (s||"").toLowerCase().normalize('NFC').replace(/[^\p{L}\p{N}\s]+/gu,' ').split(/\s+/).filter(Boolean); }
+  function loadLearn(){ return safe(localStorage.getItem(K.learn)) || {}; }
+  function saveLearn(o){ try{ localStorage.setItem(K.learn, JSON.stringify(o)); }catch{} }
+
+  const SEARCH_SYNONYMS = {
+    "xe ga": ["vision", "cub 50cc"],
+    "xe số": ["sirius", "wave"],
+    "thủ tục": ["giấy tờ", "cccd", "passport", "hộ chiếu", "bằng lái"],
+    "bảng giá": ["giá thuê", "giá xe", "bao nhiêu tiền", "chi phí"]
+  };
+  
+  const STOPWORDS = new Set(['là','và','của','cho','cần','mấy','những','các','mình','em','anh','chị','đi','ở','tôi','1','2','3']);
+
+  function scoreDocMeta(meta, query){
+    let bonus = 0;
+    const url = (meta.url||"").toLowerCase();
+    const ti  = (meta.title||"").toLowerCase();
+    const q   = (query||"").toLowerCase();
+    if(/banggia|bảng giá|gia-thue|gia_xe/.test(url+ti) && /giá|thuê|tiền|price|cost/.test(q)) bonus += 2.0;
+    if(/thutuc|thủ tục|thu-tuc/.test(url+ti) && /thủ tục|giấy tờ|cccd|passport|hộ chiếu/.test(q)) bonus += 2.0;
+    if(/loaixe|dòng xe|loai-xe/.test(url+ti)) bonus += 0.5;
+    return bonus;
+  }
+
+  function adaptiveDelta(dl, avgdl) {
+    if (dl > avgdl * 1.4) return 1.4;
+    if (dl > avgdl)       return 1.1;
+    if (dl < avgdl * 0.6) return 0.6;
+    return 0.9;
+  }
+
+  function phraseBoost(text, query) {
+    if (!text || !query) return 0;
+    const t = text.toLowerCase();
+    const q = query.toLowerCase().trim().replace(/\s+/g,' ');
+    if (t.includes(q) && q.length > 6) return 1.2; 
+    if (q.split(" ").every(w => w && t.includes(w))) return 0.4;
+    return 0;
+  }
+
+  function synonymBoost(text, query) {
+    let bonus = 0;
+    const t = text.toLowerCase();
+    const q = query.toLowerCase();
+    for (const key in SEARCH_SYNONYMS) {
+      if (q.includes(key)) {
+        SEARCH_SYNONYMS[key].forEach(s => {
+          if (t.includes(s)) bonus += 0.4;
+        });
+      }
+    }
+    if (bonus > 1.0) bonus = 1.0;
+    return bonus;
+  }
+
+  function freshnessBoost(meta) {
+    if (!meta || !meta.url) return 0;
+    const now = Date.now();
+    const pageTs = meta.ts ? (meta.ts * 1000) : 0;
+    if (!pageTs) return 0;
+    const ageHours = (now - pageTs) / 3600000;
+    if (ageHours < 24) return 0.6;
+    if (ageHours < 72) return 0.3;
+    if (ageHours < 24*14) return 0.1;
+    return 0;
+  }
+
+  function searchIndex(query, k = 3) {
+    const cache = loadLearn();
+    const docs = [];
+
+    Object.values(cache).forEach(site =>
+      (site.pages || []).forEach(p => {
+        const fullText = (p.title || '') + ' ' + (p.text || '');
+        const toks = tk(fullText);
+        docs.push({
+          id: p.url,
+          text: fullText,
+          meta: p,
+          toks: toks,
+          toksLen: toks.length
+        });
+      })
+    );
+
+    if (!docs.length) return [];
+
+    const k1 = 1.5;
+    const b  = 0.75;
+    const df = new Map();
+    const tf = new Map();
+    let totalLen = 0;
+
+    docs.forEach(d => {
+      totalLen += d.toksLen;
+      const freq = new Map();
+      d.toks.forEach(t => freq.set(t, (freq.get(t) || 0) + 1));
+      tf.set(d.id, freq);
+      new Set(d.toks).forEach(t => df.set(t, (df.get(t) || 0) + 1));
+    });
+
+    const avgdl = totalLen / Math.max(1, docs.length);
+    const N = docs.length;
+    const qToks = tk(query).filter(Boolean).filter(t => !STOPWORDS.has(t));
+
+    const scored = docs.map(d => {
+      const freq = tf.get(d.id) || new Map();
+      const realDl = d.toksLen || 1;
+      const delta = adaptiveDelta(realDl, avgdl);
+      let score = 0;
+
+      qToks.forEach(term => {
+        const f = freq.get(term) || 0;
+        const c = df.get(term) || 0;
+        if (!c) return;        
+        if (f === 0) return;
+
+        const idf = Math.log(1 + (N - c + 0.5) / (c + 0.5));
+        const norm = f + k1 * (1 - b + b * (realDl / avgdl));
+        
+        const bm25part = (f * (k1 + 1)) / norm;
+        const bm25plus = bm25part + delta;
+
+        score += idf * bm25plus;
+      });
+
+      // Chỉ cộng điểm phụ trợ nếu thực sự có Lexical match (score > 0)
+      if (score > 0) {
+        score += scoreDocMeta(d.meta, query);
+        score += phraseBoost(d.text, query);
+        score += synonymBoost(d.text, query);
+        score += freshnessBoost(d.meta);
+      }
+
+      return { score, meta: d.meta };
+    });
+
+    return scored
+      .filter(x => x.score > (CFG.smart.searchThreshold || 1.0))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, k)
+      .map(x => x.meta);
+  }
+
+  function bestSentences(text, query, k=2){
+    const sents = String(text||'').replace(/\s+/g,' ').split(/(?<=[\.\!\?])\s+/).slice(0,60);
+    const qToks=new Set(tk(query));
+    return sents
+      .map(s=>({s, sc: tk(s).reduce((a,w)=>a + (qToks.has(w)?1:0),0)}))
+      .filter(x=>x.sc>0)
+      .sort((a,b)=>b.sc-a.sc)
+      .slice(0,k)
+      .map(x=>x.s);
+  }
+
+  /* ====== CRAWLER & AUTOPRICE ====== */
+  async function fetchTextWithMeta(url){
+    const ctl = new AbortController();
+    const id = setTimeout(()=>ctl.abort(), CFG.fetchTimeoutMs);
+    try{
+      const res = await fetch(url, {signal:ctl.signal});
+      clearTimeout(id);
+      if(!res || !res.ok) return null;
+      const text = await res.text();
+      const last = res.headers.get('last-modified');
+      const ts = last ? Math.floor(new Date(last).getTime()/1000) : null;
+      return { text, ts };
+    }catch(e){
+      clearTimeout(id);
+      return null;
+    }
+  }
+
+  async function fetchText(url){ 
+    const r = await fetchTextWithMeta(url);
+    return r ? r.text : null; 
+  }
+
+  function parseXML(t){ try{ return (new DOMParser()).parseFromString(t,'text/xml'); }catch{ return null; } }
+  function parseHTML(t){ try{ return (new DOMParser()).parseFromString(t,'text/html'); }catch{ return null; } }
+
+  async function readSitemap(url){
+    const xml = await fetchText(url); if(!xml) return [];
+    const doc = parseXML(xml); if(!doc) return [];
+    const items = Array.from(doc.getElementsByTagName('item'));
+    if(items.length) return items.map(it=> it.getElementsByTagName('link')[0]?.textContent?.trim()).filter(Boolean);
+    const sm = Array.from(doc.getElementsByTagName('sitemap')).map(x=> x.getElementsByTagName('loc')[0]?.textContent?.trim()).filter(Boolean);
+    if(sm.length){
+      const all=[]; 
+      for(const loc of sm){
+        try{
+          const child = await readSitemap(loc);
+          if(child && child.length) all.push(...child);
+        }catch{}
+      }
+      return Array.from(new Set(all));
+    }
+    return Array.from(doc.getElementsByTagName('url')).map(u=> u.getElementsByTagName('loc')[0]?.textContent?.trim()).filter(Boolean);
+  }
+
+  async function fallbackCrawl(origin){
+    const start = origin.endsWith('/')? origin : origin + '/';
+    const html = await fetchText(start); if(!html) return [start];
+    const doc = parseHTML(html); if(!doc) return [start];
+    const links = Array.from(doc.querySelectorAll('a[href]')).map(a=> a.getAttribute('href')).filter(Boolean);
+    const set = new Set([start]);
+    for(const href of links){
+      try{
+        const u = new URL(href, start).toString().split('#')[0];
+        if(sameHost(u, origin)) set.add(u);
+        if(set.size>=40) break;
+      }catch{}
+    }
+    return Array.from(set);
+  }
+
+  async function pullPages(urls, stats){
+    const out=[]; stats.urlsSeen += urls.length;
+    for(const u of urls.slice(0, CFG.maxPagesPerDomain)){
+      const res = await fetchTextWithMeta(u);
+      if(!res || !res.text) continue;
+      const txt = res.text;
+      const pageTs = res.ts || nowSec();
+
+      if (/\bname=(?:"|')robots(?:"|')[^>]*content=(?:"|')[^"']*noindex/i.test(txt)) continue;
+      
+      let title = (txt.match(/<title[^>]*>([^<]+)<\/title>/i)||[])[1]||"";
+      let descMeta = (txt.match(/<meta[^>]+name=(?:"|')description(?:"|')[^>]+content=(?:"|')([\s\S]*?)(?:"|')/i)||[])[1]||"";
+      
+      // Khai thác triệt để body content thay vì bỏ qua nếu có meta desc
+      let bodyText = txt.replace(/<head>[\s\S]*?<\/head>/i, '')
+                        .replace(/<script[\s\S]*?<\/script>/gi,' ')
+                        .replace(/<style[\s\S]*?<\/style>/gi,' ')
+                        .replace(/<[^>]+>/g,' ')
+                        .replace(/\s+/g,' ')
+                        .trim()
+                        .slice(0, 2000);
+      
+      let finalContent = (descMeta + " " + bodyText).trim().slice(0, 2500);
+      
+      if(CFG.viOnly && !looksVN(title+' '+finalContent)) continue;
+      
+      out.push({url:u, title, text: finalContent, ts:pageTs});
+      await sleep(CFG.fetchPauseMs);
+    }
+    return out;
+  }
+
+  async function learnSites(origins, force){
+    const list = Array.from(new Set(origins||[])).slice(0, 12);
+    const cache = loadLearn(); const results = {}; let total=0;
+    for(const origin of list){
+      try{
+        const key = new URL(origin).origin;
+        if(!force && cache[key] && ((nowSec()-cache[key].ts)/3600)<CFG.refreshHours && cache[key].pages?.length){
+          results[key]=cache[key]; total+=cache[key].pages.length; if(total>=CFG.maxTotalPages) break; continue;
+        }
+        let urls=[];
+        const smc = [key+'/sitemap.xml', key+'/sitemap_index.xml'];
+        for(const c of smc){
+          try{
+            const u=await readSitemap(c);
+            if(u && u.length){ urls=u; break; }
+          }catch{}
+        }
+        if(!urls.length) urls = await fallbackCrawl(key);
+        const uniq = Array.from(new Set(
+          urls
+            .map(u=>{ try{ return new URL(u).toString().split('#')[0]; }catch{ return null; } })
+            .filter(Boolean)
+            .filter(u=> sameHost(u, key))
+        ));
+        const pages = await pullPages(uniq, {urlsSeen:0});
+        if(pages.length){
+          cache[key]={domain:key, ts:nowSec(), pages};
+          try{ saveLearn(cache); }
+          catch{
+            const ks=Object.keys(cache); if(ks.length) delete cache[ks[0]];
+            saveLearn(cache);
+          }
+          results[key]=cache[key]; total+=pages.length;
+        }
+        if(total >= CFG.maxTotalPages) break;
+      }catch(e){}
+    }
+    localStorage.setItem(K.stamp, Date.now());
+    return results;
+  }
+
+  /* ====== ANSWER LOGIC (STATEFUL) ====== */
+  const PREFIX = ["Chào anh/chị,","Dạ,","Em chào anh/chị,","Dạ vâng,"];
+  function polite(s){ return naturalize(`${pick(PREFIX)} ${s}`); }
+
+  async function deepAnswer(userText){
+    const q = (userText||"").trim();
+    const ctx = getCtx();
+
+    const intents = detectIntent(q);
+    const newModel = detectType(q);
+    const newQty   = detectQty(q);
+    const newName  = detectName(q);
+    const area     = detectArea(q);
+
+    if(newName){
+      ctx.name = newName;
+      try{ localStorage.setItem(K.ctx, JSON.stringify(ctx)); }catch{}
+    }
+
+    let currentModel = newModel;
+    if(!currentModel){
+      for(let i=ctx.turns.length-1;i>=0;i--){
+        if(ctx.turns[i].type){ currentModel = ctx.turns[i].type; break; }
+      }
+    }
+
+    let lastBotState = null;
+    for(let i=ctx.turns.length-1;i>=0;i--){
+      const t = ctx.turns[i];
+      if(t.from === "bot" && t.state){
+        lastBotState = t;
+        break;
+      }
+    }
+
+    if(lastBotState && lastBotState.state === "ASK_DURATION" && newQty){
+      const modelUse = currentModel || lastBotState.type || null;
+      const ans = composePrice(modelUse, newQty);
+      pushCtx({from:"bot", raw:ans, state:null, type:modelUse, qty:newQty});
+      return ans;
+    }
+    if(lastBotState && lastBotState.state === "ASK_MODEL" && newModel){
+      const qtyUse = lastBotState.qty || newQty || null;
+      const ans = composePrice(newModel, qtyUse);
+      pushCtx({from:"bot", raw:ans, state:null, type:newModel, qty:qtyUse});
+      return ans;
+    }
+
+    let topIntent = null, topScore = 0;
+    Object.entries(intents).forEach(([k,v])=>{ if(v>topScore){ topScore=v; topIntent=k; } });
+    const hasIntent = topScore > 0;
+
+    if(!hasIntent && /(chào|xin chào|hello|hi\b)/i.test(q)){
+      const n = ctx.name ? ` ${ctx.name}` : "";
+      const ans = polite(`em là AI của ${CFG.brand}. Anh/chị${n} cần thuê xe mẫu nào ạ?`);
+      pushCtx({from:"bot", raw:ans, state:null});
+      return ans;
+    }
+
+    if(topIntent === 'needPrice' || (currentModel && newQty)){
+      const qtyUse = newQty || null;
+      const ans = composePrice(currentModel, qtyUse);
+      pushCtx({from:"bot", raw:ans, state:null, type:currentModel, qty:qtyUse});
+      return ans;
+    }
+
+    if(topIntent === "needContact"){
+      const ans = polite(`anh/chị có thể gọi trực tiếp ${CFG.phone} để được hỗ trợ ạ.`);
+      pushCtx({ from: "bot", raw: ans, state: null });
+      return ans;
+    }
+    
+    if(topIntent === "needLocation"){
+      const ans = polite(`cửa hàng tại Ngõ 5 Nguyễn Văn Cừ, Long Biên, Hà Nội. Anh/chị có thể bấm biểu tượng bản đồ phía trên để chỉ đường ạ.`);
+      pushCtx({from:"bot", raw:ans, state:null});
+      return ans;
+    }
+
+    if(topIntent === "needDocs"){
+      const ans = polite(`giấy tờ và điều kiện thuê được xác nhận theo từng trường hợp. Anh/chị vui lòng gọi ${CFG.phone} trước khi nhận xe để kiểm tra chính xác ạ.`);
+      pushCtx({ from: "bot", raw: ans, state: null });
+      return ans;
+    }
+    
+    if(topIntent === "needPolicy"){
+      const ans = polite(`các điều kiện như tiền cọc, trả xe và các phát sinh liên quan cần được xác nhận trực tiếp tại thời điểm thuê. Anh/chị vui lòng gọi ${CFG.phone} ạ.`);
+      pushCtx({ from: "bot", raw: ans, state: null });
+      return ans;
+    }
+    
+    if(topIntent === "needReturn"){
+      const ans = polite(`việc gia hạn hoặc trả xe cần được thông báo trước. Anh/chị vui lòng gọi ${CFG.phone} để được hỗ trợ ạ.`);
+      pushCtx({ from: "bot", raw: ans, state: null });
+      return ans;
+    }
+
+    if(topIntent === "needDelivery"){
+      const ans = polite(`khả năng giao hoặc nhận xe phụ thuộc khu vực và lịch xe tại thời điểm đặt. Anh/chị vui lòng gọi ${CFG.phone} để xác nhận ạ.`);
+      pushCtx({ from: "bot", raw: ans, state: null });
+      return ans;
+    }
+
+    try{
+      const top = searchIndex(q, 3);
+      if(top && top.length){
+        if(CFG.smart.extractiveQA){
+          const sn = bestSentences((top[0].title+'. ')+top[0].text, q, 2).join(' ');
+          if(sn && sn.length>20){
+            const ans = naturalize(sn);
+            pushCtx({from:"bot", raw:ans, state:null});
+            return ans;
+          }
+        }
+        const ans = polite(((top[0].title?top[0].title+' — ':'')+top[0].text).slice(0,160)+'...');
+        pushCtx({from:"bot", raw:ans, state:null});
+        return ans;
+      }
+    }catch(e){}
+
+    if(currentModel && !newQty){
+      const ans = polite(`anh/chị định thuê xe ${currentModel} trong bao lâu để em tính giá tốt nhất ạ?`);
+      pushCtx({from:"bot", raw:ans, state:"ASK_DURATION", type:currentModel});
+      return ans;
+    }
+
+    const ans = polite(`anh/chị đang quan tâm mẫu xe nào (Cub 50cc, Vision, Sirius...) và dự định thuê mấy ngày ạ?`);
+    pushCtx({from:"bot", raw:ans, state:"ASK_MODEL"});
+    return ans;
+  }
+
+  /* ====== CONTROLLER & EVENTS ====== */
+  let isOpen=false, sending=false, vvBound=false;
+
+  function showTyping(){
+    const body = $("#mta-body"); if(!body) return;
+    if($("#mta-typing")) return;
+    const box = document.createElement("div");
+    box.id = "mta-typing";
+    box.innerHTML = `<div class="dot-flashing"></div>`;
+    body.appendChild(box);
+    body.scrollTop = body.scrollHeight;
+  }
+  function hideTyping(){ const t=$("#mta-typing"); if(t) t.remove(); }
+
+  async function sendUser(text){
+    if(sending) return;
+    const v=(text||"").trim(); 
+    if(!v) return;
+    sending=true;
+
+    try {
+      addMsg("user", v);
+      const t = detectType(v); const q = detectQty(v); const n = detectName(v);
+      pushCtx({from:"user", raw:v, type:t, qty:q, name:n});
+
+      showTyping();
+      await sleep((window.innerWidth < 480 ? 800 : 1200) + Math.random()*500);
+
+      const ans = await deepAnswer(v);
+      hideTyping();
+      addMsg("bot", sanitizeReply(ans));
+    } catch(e) {
+      hideTyping();
+      addMsg("bot", `Có lỗi xử lý. Anh/chị vui lòng gọi ${CFG.phone} để được hỗ trợ.`);
+    } finally {
+      sending = false;
+    }
+  }
+
+  function openChat(){
+    if(isOpen) return;
+    $("#mta-card").classList.add("open");
+    $("#mta-card").setAttribute("aria-hidden", "false");
+    $("#mta-backdrop").classList.add("show");
+    $("#mta-bubble").style.transform = "scale(0) rotate(90deg)";
+    setTimeout(()=>$("#mta-bubble").style.display="none", 200);
+    isOpen=true;
+    renderSess();
+    setTimeout(()=>{ const i=$("#mta-in"); if(i) i.focus(); }, 300);
+    adjustForIOS();
+  }
+
+  function closeChat(){
+    if(!isOpen) return;
+    $("#mta-card").classList.remove("open");
+    $("#mta-card").setAttribute("aria-hidden", "true");
+    $("#mta-backdrop").classList.remove("show");
+    $("#mta-bubble").style.display="flex";
+    setTimeout(()=>$("#mta-bubble").style.transform="scale(1) rotate(0)", 10);
+    isOpen=false; hideTyping();
+    const card = $("#mta-card");
+    if(card){ 
+      card.style.bottom = ""; 
+      card.style.height = ""; 
+    }
+  }
+
+  function adjustForIOS(){
+    if(!window.visualViewport) return;
+    if(vvBound) return;
+    const card = $("#mta-card");
+    const view = window.visualViewport;
+
+    function onResize(){
+      if(!isOpen) return;
+      if(view.height < window.innerHeight - 100){
+        if(window.innerWidth <= 480){
+          card.style.height = view.height + "px";
+          card.style.bottom = "0px";
+        } else {
+          const offset = window.innerHeight - view.height;
+          card.style.bottom = (offset + 10) + "px";
+        }
+        const body=$("#mta-body"); if(body) body.scrollTop=body.scrollHeight;
+      } else {
+        card.style.height = window.innerWidth <= 480 ? "100%" : "75vh";
+        card.style.bottom = window.innerWidth <= 480 ? "0px" : "20px";
+      }
+    }
+
+    view.addEventListener("resize", onResize);
+    view.addEventListener("scroll", onResize);
+    vvBound = true;
+  }
+
+  function bindEvents(){
+    $("#mta-bubble").addEventListener("click", openChat);
+    $("#mta-backdrop").addEventListener("click", closeChat);
+    $("#mta-close").addEventListener("click", closeChat);
+    $("#mta-send").addEventListener("click", ()=>{
+      const inp=$("#mta-in"); const v=inp.value.trim(); if(!v) return; inp.value=""; sendUser(v);
+    });
+    $("#mta-in").addEventListener("keydown", e=>{
+      if(e.key==="Enter" && !e.shiftKey){
+        e.preventDefault();
+        const v=e.target.value.trim(); if(!v) return;
+        e.target.value=""; sendUser(v);
+      }
+      const tags=$("#mta-tags");
+      if(tags){
+        if(e.target.value.trim().length>0) tags.classList.add('hidden');
+        else tags.classList.remove('hidden');
+      }
+    });
+    const track = $("#mta-tag-track");
+    if(track){
+      track.querySelectorAll("button").forEach(btn=>{
+        btn.addEventListener("click", ()=> sendUser(btn.dataset.q||btn.textContent));
+      });
+    }
+  }
+
+  function ready(fn){
+    if(document.readyState==="complete"||document.readyState==="interactive") fn();
+    else document.addEventListener("DOMContentLoaded", fn);
+  }
+
+  ready(async ()=>{
+    const lastClean = parseInt(localStorage.getItem(K.clean)||0);
+    if(!lastClean || (Date.now()-lastClean) > 7*24*3600*1000){
+      localStorage.removeItem(K.ctx);
+      localStorage.setItem(K.clean, Date.now());
+    }
+
+    const wrap=document.createElement("div"); wrap.innerHTML=HTML; document.body.appendChild(wrap.firstElementChild);
+    const st=document.createElement("style"); st.textContent=CSS; document.head.appendChild(st);
+    bindEvents(); adjustForIOS();
+
+    if(CFG.autolearn){
+      const origins = Array.from(new Set([location.origin, ...(CFG.extraSites||[])]));
+      const last = parseInt(localStorage.getItem(K.stamp)||0);
+      if(!last || (Date.now()-last) >= CFG.refreshHours*3600*1000){
+        await learnSites(origins, false);
+      }
+    }
+  });
+
+  window.MotoAI_v41 = {
+    open: openChat,
+    close: closeChat,
+    send: sendUser,
+    learnNow: async (sites, force)=> await learnSites(sites||[location.origin], !!force),
+    clear: ()=> { localStorage.removeItem(K.learn); localStorage.removeItem(K.autoprices); localStorage.removeItem(K.ctx); }
+  };
+})();
